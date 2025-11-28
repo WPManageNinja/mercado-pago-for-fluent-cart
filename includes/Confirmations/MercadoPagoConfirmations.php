@@ -11,15 +11,28 @@ use FluentCart\App\Modules\Subscriptions\Services\SubscriptionService;
 use FluentCart\Framework\Support\Arr;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
+
+if (!defined('ABSPATH')) {
+    exit; // Direct access not allowed.
+}
+
 class MercadoPagoConfirmations
 {
     public function init()
     {
+        // One-time payment handlers
         add_action('wp_ajax_nopriv_fluent_cart_create_mercadopago_payment', [$this, 'createMercadoPagoPayment']);
         add_action('wp_ajax_fluent_cart_create_mercadopago_payment', [$this, 'createMercadoPagoPayment']);
         
         add_action('wp_ajax_nopriv_fluent_cart_confirm_mercadopago_payment', [$this, 'confirmMercadoPagoPayment']);
         add_action('wp_ajax_fluent_cart_confirm_mercadopago_payment', [$this, 'confirmMercadoPagoPayment']);
+        
+        // Subscription handlers
+        add_action('wp_ajax_nopriv_fluent_cart_create_mercadopago_subscription', [$this, 'createMercadoPagoSubscription']);
+        add_action('wp_ajax_fluent_cart_create_mercadopago_subscription', [$this, 'createMercadoPagoSubscription']);
+        
+        add_action('wp_ajax_nopriv_fluent_cart_confirm_mercadopago_subscription', [$this, 'confirmMercadoPagoSubscription']);
+        add_action('wp_ajax_fluent_cart_confirm_mercadopago_subscription', [$this, 'confirmMercadoPagoSubscription']);
     }
 
     /**
@@ -27,7 +40,6 @@ class MercadoPagoConfirmations
      */
     public function createMercadoPagoPayment()
     {
-        // Verify nonce
         if (isset($_REQUEST['mercadopago_fct_nonce'])) {
             $nonce = sanitize_text_field(wp_unslash($_REQUEST['mercadopago_fct_nonce']));
             if (!wp_verify_nonce($nonce, 'mercadopago_fct_nonce')) {
@@ -115,7 +127,6 @@ class MercadoPagoConfirmations
 
         $mercadoPagoPaymentId = sanitize_text_field(wp_unslash($_REQUEST['payment_id']) ?? '');
         
-        // Get the payment from Mercado Pago
         $mercadoPagoPayment = MercadoPagoAPI::getMercadoPagoObject('v1/payments/' . $mercadoPagoPaymentId);
 
         if (is_wp_error($mercadoPagoPayment)) {
@@ -127,7 +138,6 @@ class MercadoPagoConfirmations
 
         $externalReference = Arr::get($mercadoPagoPayment, 'external_reference', '');
 
-        // Find the transaction by UUID
         $transactionModel = null;
 
         if ($externalReference) {
@@ -145,7 +155,6 @@ class MercadoPagoConfirmations
         }
 
   
-        // Check if already processed
         if ($transactionModel->status === Status::TRANSACTION_SUCCEEDED) {
             wp_send_json([
                 'redirect_url' => $transactionModel->getReceiptPageUrl(),
@@ -159,7 +168,6 @@ class MercadoPagoConfirmations
 
         $paymentStatus = Arr::get($mercadoPagoPayment, 'status');
         
-        // Check if payment is approved
         if ($paymentStatus !== 'approved') {
             wp_send_json([
                 'message' => sprintf(
@@ -194,9 +202,7 @@ class MercadoPagoConfirmations
         ], 200);
     }
 
-    /**
-     * Confirm payment success and update transaction
-     */
+
     public function confirmPaymentSuccessByCharge(OrderTransaction $transactionModel, $args = [])
     {
         $vendorChargeId = Arr::get($args, 'vendor_charge_id');
@@ -252,6 +258,188 @@ class MercadoPagoConfirmations
         }
 
         return (new StatusHelper($order))->syncOrderStatuses($transactionModel);
+    }
+
+    public function createMercadoPagoSubscription()
+    {
+        // Verify nonce
+        if (isset($_REQUEST['mercadopago_fct_nonce'])) {
+            $nonce = sanitize_text_field(wp_unslash($_REQUEST['mercadopago_fct_nonce']));
+            if (!wp_verify_nonce($nonce, 'mercadopago_fct_nonce')) {
+                wp_send_json([
+                    'error' => true,
+                    'message' => 'Invalid nonce. Please refresh the page and try again.',
+                ], 400);
+            }
+        } else {
+            wp_send_json([
+                'error' => true,
+                'message' => 'Nonce is required for security verification.',
+            ], 400);
+        }
+
+        if (!isset($_REQUEST['subscription_data'])) {
+            wp_send_json([
+                'error' => true,
+                'message' => 'Subscription data is required.',
+            ], 400);
+        }
+
+        $subscriptionData = json_decode(wp_unslash($_REQUEST['subscription_data']), true);
+
+        if (!$subscriptionData) {
+            wp_send_json([
+                'error' => true,
+                'message' => 'Invalid subscription data format.',
+            ], 400);
+        }
+
+        // Create preapproval (subscription) via Mercado Pago API
+        $preapproval = MercadoPagoAPI::createMercadoPagoObject('preapproval', $subscriptionData);
+
+        if (is_wp_error($preapproval)) {
+            wp_send_json([
+                'error' => true,
+                'message' => $preapproval->get_error_message(),
+            ], 500);
+        }
+
+        $subscriptionId = Arr::get($preapproval, 'id');
+        $status = Arr::get($preapproval, 'status');
+
+        if (!$subscriptionId) {
+            wp_send_json([
+                'error' => true,
+                'message' => __('Failed to create subscription.', 'mercado-pago-for-fluent-cart'),
+            ], 500);
+        }
+
+        wp_send_json([
+            'error' => false,
+            'subscription_id' => $subscriptionId,
+            'status' => $status,
+        ], 200);
+    }
+
+    public function confirmMercadoPagoSubscription()
+    {
+        // Verify nonce
+        if (isset($_REQUEST['mercadopago_fct_nonce'])) {
+            $nonce = sanitize_text_field(wp_unslash($_REQUEST['mercadopago_fct_nonce']));
+            if (!wp_verify_nonce($nonce, 'mercadopago_fct_nonce')) {
+                wp_send_json([
+                    'message' => 'Invalid nonce. Please refresh the page and try again.',
+                    'status' => 'failed'
+                ], 400);
+            }
+        } else {
+            wp_send_json([
+                'message' => 'Nonce is required for security verification.',
+                'status' => 'failed'
+            ], 400);
+        }
+
+        if (!isset($_REQUEST['subscription_id'])) {
+            wp_send_json([
+                'message' => 'Subscription ID is required to confirm the subscription.',
+                'status' => 'failed'
+            ], 400);
+        }
+
+        $mercadoPagoSubscriptionId = sanitize_text_field(wp_unslash($_REQUEST['subscription_id']) ?? '');
+        $transactionHash = sanitize_text_field(wp_unslash($_REQUEST['transaction_hash']) ?? '');
+        
+
+        $mercadoPagoSubscription = MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $mercadoPagoSubscriptionId);
+
+        if (is_wp_error($mercadoPagoSubscription)) {
+            wp_send_json([
+                'message' => $mercadoPagoSubscription->get_error_message(),
+                'status' => 'failed'
+            ], 500);
+        }
+
+        $externalReference = Arr::get($mercadoPagoSubscription, 'external_reference', '');
+
+
+        $transactionModel = null;
+
+        if ($externalReference) {
+            $transactionModel = OrderTransaction::query()
+                ->where('uuid', $externalReference)
+                ->where('payment_method', 'mercado_pago')
+                ->first();
+        }
+
+        if (!$transactionModel && $transactionHash) {
+            $transactionModel = OrderTransaction::query()
+                ->where('uuid', $transactionHash)
+                ->where('payment_method', 'mercado_pago')
+                ->first();
+        }
+
+        if (!$transactionModel) {
+            wp_send_json([
+                'message' => 'Transaction not found for the provided reference.',
+                'status' => 'failed'
+            ], 404);
+        }
+
+
+        if ($transactionModel->status === Status::TRANSACTION_SUCCEEDED) {
+            wp_send_json([
+                'redirect_url' => $transactionModel->getReceiptPageUrl(),
+                'order' => [
+                    'uuid' => $transactionModel->order->uuid,
+                ],
+                'message' => __('Subscription already confirmed. Redirecting...!', 'mercado-pago-for-fluent-cart'),
+                'status' => 'success'
+            ], 200);
+        }
+
+        $subscriptionStatus = Arr::get($mercadoPagoSubscription, 'status');
+        
+
+        $subscriptionModel = Subscription::query()
+            ->where('id', $transactionModel->subscription_id)
+            ->first();
+
+        if (!$subscriptionModel) {
+            wp_send_json([
+                'message' => 'Subscription not found.',
+                'status' => 'failed'
+            ], 404);
+        }
+
+
+        $subscriptionModel->update([
+            'vendor_subscription_id' => $mercadoPagoSubscriptionId,
+            'status' => \MercadoPagoFluentCart\MercadoPagoHelper::getFctSubscriptionStatus($subscriptionStatus),
+        ]);
+
+
+        $transactionModel->update([
+            'status' => Status::TRANSACTION_SUCCEEDED,
+            'vendor_charge_id' => $mercadoPagoSubscriptionId,
+        ]);
+
+
+        $order = $transactionModel->order;
+        (new StatusHelper($order))->syncOrderStatuses($transactionModel);
+
+        fluent_cart_add_log(__('Mercado Pago Subscription Confirmation', 'mercado-pago-for-fluent-cart'), __('Subscription confirmed. ID:', 'mercado-pago-for-fluent-cart') . ' ' . $mercadoPagoSubscriptionId, 'info', [
+            'module_name' => 'order',
+            'module_id' => $order->id,
+        ]);
+
+        wp_send_json([
+            'redirect_url' => $transactionModel->getReceiptPageUrl(),
+            'order' => [
+                'uuid' => $transactionModel->order->uuid,
+            ],
+            'message' => __('Subscription confirmed successfully. Redirecting...!', 'mercado-pago-for-fluent-cart'),
+            'status' => 'success'
+        ], 200);
     }
 }
 

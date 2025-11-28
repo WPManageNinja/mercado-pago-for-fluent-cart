@@ -9,9 +9,6 @@ use FluentCart\Framework\Support\Arr;
 
 class MercadoPagoProcessor
 {
-    /**
-     * Handle single payment
-     */
     public function handleSinglePayment(PaymentInstance $paymentInstance, $paymentArgs = [])
     {
         $order = $paymentInstance->order;
@@ -21,7 +18,6 @@ class MercadoPagoProcessor
         // Format amount based on currency
         $amount = MercadoPagoHelper::formatAmount($transaction->total, $transaction->currency);
 
-        // Prepare payment data for Mercado Pago
         $paymentData = [
             'transaction_amount' => $amount,
             'description'        => sprintf(__('Order #%s', 'mercado-pago-for-fluent-cart'), $order->id),
@@ -41,7 +37,6 @@ class MercadoPagoProcessor
             ]
         ];
 
-        // Add billing address if available
         if ($order->billing_address) {
             $paymentData['additional_info'] = [
                 'payer' => [
@@ -54,13 +49,12 @@ class MercadoPagoProcessor
             ];
         }
 
-        // Apply filters for customization
         $paymentData = apply_filters('fluent_cart/mercadopago/onetime_payment_args', $paymentData, [
             'order'       => $order,
             'transaction' => $transaction
         ]);
 
-        // Return data for frontend to create payment
+
         return [
             'status'       => 'success',
             'nextAction'   => 'mercado_pago',

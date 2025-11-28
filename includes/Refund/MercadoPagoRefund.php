@@ -8,6 +8,11 @@ use FluentCart\App\Services\Payments\PaymentHelper;
 use FluentCart\Framework\Support\Arr;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
+
+if (!defined('ABSPATH')) {
+    exit; // Direct access not allowed.
+}
+
 class MercadoPagoRefund
 {
 
@@ -75,7 +80,6 @@ class MercadoPagoRefund
             ->get();
 
         if ($allRefunds->isEmpty()) {
-            // This is the first refund for this order
             $createdRefund = OrderTransaction::query()->create($refundData);
             return $createdRefund instanceof OrderTransaction ? $createdRefund : null;
         }
@@ -89,7 +93,7 @@ class MercadoPagoRefund
                     $refund->fill($refundData);
                     $refund->save();
                 }
-                // This refund already exists
+
                 return $refund;
             }
 

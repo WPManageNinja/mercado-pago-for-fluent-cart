@@ -197,6 +197,7 @@ class MercadoPagoWebhook
             $this->sendResponse(200, 'No subscription found for the order, skipping subscription update.');
         }
 
+        $oldStatus = $subscriptionModel->status;
         $status = MercadoPagoHelper::getFctSubscriptionStatus(Arr::get($mercadoPagoSubscription, 'status'));
 
         $updateData = [
@@ -209,10 +210,25 @@ class MercadoPagoWebhook
 
         $subscriptionModel->update($updateData);
 
+        // Store payment method info if available
+        $cardInfo = Arr::get($mercadoPagoSubscription, 'card_id');
+        if ($cardInfo) {
+            $billingInfo = [
+                'type'              => 'card',
+                'payment_method_id' => $cardInfo,
+            ];
+            $subscriptionModel->updateMeta('active_payment_method', $billingInfo);
+        }
+
         fluent_cart_add_log(__('Mercado Pago Subscription Updated', 'mercado-pago-for-fluent-cart'), 'Subscription updated from Mercado Pago. ID: ' . Arr::get($mercadoPagoSubscription, 'id'), 'info', [
             'module_name' => 'order',
             'module_id'   => $order->id
         ]);
+
+        // Trigger subscription activated event if status changed to active
+        if ($oldStatus != $status && in_array($status, [Status::SUBSCRIPTION_ACTIVE, Status::SUBSCRIPTION_TRIALING])) {
+            (new SubscriptionActivated($subscriptionModel, $order, $order->customer))->dispatch();
+        }
 
         $this->sendResponse(200, 'Subscription updated successfully');
     }

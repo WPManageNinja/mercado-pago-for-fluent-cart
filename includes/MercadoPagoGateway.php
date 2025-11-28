@@ -1,17 +1,7 @@
 <?php
-/**
- * Mercado Pago Gateway Class
- *
- * @package MercadoPagoFluentCart
- * @since 1.0.0
- */
-
 
 namespace MercadoPagoFluentCart;
 
-if (!defined('ABSPATH')) {
-    exit; // Direct access not allowed.
-}
 
 use FluentCart\App\Helpers\Helper;
 use FluentCart\App\Helpers\Status;
@@ -22,6 +12,10 @@ use FluentCart\App\Services\PluginInstaller\PaymentAddonManager;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 use MercadoPagoFluentCart\Subscriptions\MercadoPagoSubscriptions;
 use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
+
+if (!defined('ABSPATH')) {
+    exit; // Direct access not allowed.
+}
 
 class MercadoPagoGateway extends AbstractPaymentGateway
 {

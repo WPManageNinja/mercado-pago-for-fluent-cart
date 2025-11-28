@@ -2,6 +2,7 @@
 
 namespace MercadoPagoFluentCart\Subscriptions;
 
+use FluentCart\App\Helpers\Status;
 use FluentCart\App\Models\OrderTransaction;
 use FluentCart\App\Modules\PaymentMethods\Core\AbstractSubscriptionModule;
 use FluentCart\App\Services\Payments\PaymentInstance;
@@ -20,20 +21,136 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         $transaction = $paymentInstance->transaction;
         $fcCustomer = $paymentInstance->order->customer;
 
-        // Note: Mercado Pago subscriptions require creating a preapproval plan first
-        // For now, we'll return a simple implementation
-        // Full subscription support can be added later
+        // Get or create preapproval plan
+        $plan = $this->getOrCreatePreapprovalPlan($paymentInstance);
 
-        return new \WP_Error(
-            'subscription_not_implemented',
-            __('Mercado Pago subscription support is coming soon. Please use one-time payments for now.', 'mercado-pago-for-fluent-cart')
-        );
+        if (is_wp_error($plan)) {
+            return $plan;
+        }
 
-        // TODO: Implement full subscription logic
-        // 1. Create preapproval plan
-        // 2. Create subscription with plan
-        // 3. Handle subscription authorization
-        // 4. Store subscription details
+        $subscription->update([
+            'vendor_plan_id' => Arr::get($plan, 'id'),
+        ]);
+
+        $amount = MercadoPagoHelper::formatAmount($transaction->total, $transaction->currency);
+
+        $paymentData = [
+            'preapproval_plan_id' => Arr::get($plan, 'id'),
+            'reason'              => sprintf(__('Subscription for Order #%s', 'mercado-pago-for-fluent-cart'), $order->id),
+            'external_reference'  => $transaction->uuid,
+            'payer_email'         => $fcCustomer->email,
+            'back_url'            => $args['success_url'] ?? '',
+            'status'              => 'pending',
+            'metadata'            => [
+                'order_id'          => $order->id,
+                'order_hash'        => $order->uuid,
+                'transaction_hash'  => $transaction->uuid,
+                'subscription_hash' => $subscription->uuid,
+                'customer_name'     => $fcCustomer->first_name . ' ' . $fcCustomer->last_name,
+            ]
+        ];
+
+
+        $paymentData = apply_filters('fluent_cart/mercadopago/subscription_payment_args', $paymentData, [
+            'order'        => $order,
+            'transaction'  => $transaction,
+            'subscription' => $subscription
+        ]);
+
+        return [
+            'status'       => 'success',
+            'nextAction'   => 'mercado_pago',
+            'actionName'   => 'custom',
+            'message'      => __('Please complete your subscription payment', 'mercado-pago-for-fluent-cart'),
+            'data'         => [
+                'payment_data'      => $paymentData,
+                'intent'            => 'subscription',
+                'transaction_hash'  => $transaction->uuid,
+                'amount'            => $amount,
+                'currency'          => $transaction->currency,
+                'plan_id'           => Arr::get($plan, 'id'),
+            ]
+        ];
+    }
+
+    public function getOrCreatePreapprovalPlan(PaymentInstance $paymentInstance)
+    {
+        $subscription = $paymentInstance->subscription;
+        $order = $paymentInstance->order;
+        $transaction = $paymentInstance->transaction;
+
+
+        $existingPlanId = $subscription->vendor_plan_id;
+        
+        if ($existingPlanId) {
+            $plan = MercadoPagoAPI::getMercadoPagoObject('preapproval_plan/' . $existingPlanId);
+            
+            if (!is_wp_error($plan) && Arr::get($plan, 'id')) {
+                return $plan;
+            }
+        }
+
+        // Create new plan
+        $amount = MercadoPagoHelper::formatAmount($subscription->recurring_amount, $transaction->currency);
+        
+        // Map FluentCart interval to Mercado Pago frequency
+        $frequency = $this->mapInterval($subscription->billing_interval);
+        $frequencyType = $this->mapIntervalType($subscription->billing_interval);
+
+        $billingPeriod = apply_filters('fluent_cart/mercadopago/subscription_billing_period', [
+            'interval_unit' => $this->mapIntervalType($subscription->billing_interval),
+            'interval_frequency' => $this->mapInterval($subscription->billing_interval),
+        ], [
+            'subscription_interval' => $subscription->billing_interval,
+            'payment_method' => 'mercado_pago',
+        ]);
+
+        $planData = [
+            'reason'              => $this->getPlanName($subscription, $order),
+            'auto_recurring'      => [
+                'frequency'           => Arr::get($billingPeriod, 'interval_frequency'),
+                'frequency_type'      => Arr::get($billingPeriod, 'interval_unit'),
+                'transaction_amount'  => $amount,
+                'currency_id'         => strtoupper($transaction->currency),
+            ],
+            'back_url'            => $transaction->getSuccessUrl(),
+            'external_reference'  => $subscription->uuid,
+        ];
+
+
+        if ($subscription->trial_days && $subscription->trial_days > 0) {
+            $planData['auto_recurring']['free_trial'] = [
+                'frequency'      => (int) $subscription->trial_days,
+                'frequency_type' => 'days',
+            ];
+        }
+
+        $planData = apply_filters('fluent_cart/mercadopago/preapproval_plan_args', $planData, [
+            'subscription' => $subscription,
+            'order'        => $order
+        ]);
+
+
+        $plan = MercadoPagoAPI::createMercadoPagoObject('preapproval_plan', $planData);
+
+        if (is_wp_error($plan)) {
+            return $plan;
+        }
+
+        return $plan;
+    }
+
+ 
+    private function getPlanName($subscription, $order)
+    {
+        $items = $subscription->subscription_items;
+        
+        if (!empty($items)) {
+            $firstItem = $items[0];
+            return $firstItem['post_title'] ?? sprintf(__('Subscription Plan #%s', 'mercado-pago-for-fluent-cart'), $subscription->id);
+        }
+
+        return sprintf(__('Subscription Plan #%s', 'mercado-pago-for-fluent-cart'), $subscription->id);
     }
 
     public function cancel($subscription, $args = [])
@@ -76,7 +193,7 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         $next = null;
 
         do {
-            $transactions = MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $subscriptionModel->vendor_subscription_id . '/transactions');
+            $transactions = MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $subscriptionModel->vendor_subscription_id . '/transactions', []);
             if (is_wp_error($transactions)) {
                 break;
             }
@@ -104,12 +221,12 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
                 $transactionModel = null;
                 $transactionModel = OrderTransaction::query()->where('vendor_charge_id', $vendorChargeId)->first();
 
-                if ($transactionModel) {
-                    continue;
-                }
+                 if ($transactionModel) {
+                     continue;
+                 }
 
-                if (!$transactionModel) {
-                    $transactionModel = OrderTransaction::query()->where('vendor_charge_id', '')->where('transaction_type', Status::TRANSACTION_TYPE_CHARGE)->first();
+                 if (!$transactionModel) {
+                     $transactionModel = OrderTransaction::query()->where('vendor_charge_id', '')->where('status', Status::TRANSACTION_PENDING)->first();
 
                     if ($transactionModel) {
                         $transactionModel->update([
@@ -146,9 +263,15 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
 
     private function mapInterval($fluentcartInterval)
     {
+        // This returns the frequency count, which is already in billing_interval_count
+        return 1;
+    }
+
+    private function mapIntervalType($fluentcartInterval)
+    {
         $intervalMap = [
             'day'   => 'days',
-            'week'  => 'weeks',
+            'week'  => 'months', // Mercado Pago doesn't have weeks, use months
             'month' => 'months',
             'year'  => 'years'
         ];

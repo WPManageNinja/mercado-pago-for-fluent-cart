@@ -32,12 +32,13 @@ class MercadoPagoCheckout {
             const amount = remoteResponse?.data?.amount;
             const intent = remoteResponse?.data?.intent;
             const transactionHash = remoteResponse?.data?.transaction_hash;
+            const planId = remoteResponse?.data?.plan_id;
 
             if (paymentData && amount) {
                 if (intent === 'onetime') {
                     await this.initializeMercadoPago(paymentData, amount, transactionHash);
                 } else if (intent === 'subscription') {
-                    this.showError(this.$t('Subscription payments are coming soon.'));
+                    await this.initializeMercadoPagoSubscription(paymentData, amount, transactionHash, planId);
                 }
             }
         });
@@ -196,7 +197,7 @@ class MercadoPagoCheckout {
                         this.paymentLoader.enableCheckoutButton(this.$t('Pay Now'));
                     },
                     onSubmit: async (formData) => {
-                        return await this.handlePaymentSubmit(formData, paymentData, transactionHash);
+                        return await this.handlePaymentSubmit(formData, paymentData, transactionHash, 'onetime');
                     },
                     onError: (error) => {
                         console.error('Payment Brick error:', error);
@@ -211,42 +212,145 @@ class MercadoPagoCheckout {
         }
     }
 
-    async handlePaymentSubmit(formData, paymentData, transactionHash) {
-        this.paymentLoader.changeLoaderStatus('processing');
-        
+    async initializeMercadoPagoSubscription(paymentData, amount, transactionHash, planId) {
         try {
-            // Merge form data with payment data
-            const finalPaymentData = {
-                ...paymentData,
-                token: formData.token,
-                issuer_id: formData.issuer_id,
-                payment_method_id: formData.payment_method_id,
-                transaction_amount: formData.transaction_amount,
-                installments: formData.installments,
-                payer: {
-                    ...paymentData.payer,
-                    email: formData.payer.email,
-                    identification: formData.payer.identification,
-                }
-            };
-
-            // Create payment via backend (secure)
-            const paymentResponse = await this.createPayment(finalPaymentData, transactionHash);
-
-            if (paymentResponse.error || !paymentResponse.payment_id) {
-                this.showError(paymentResponse.message || this.$t('Payment failed'));
-                this.paymentLoader.hideLoader();
+            // Initialize MercadoPago SDK
+            if (!this.#publicKey) {
+                this.showError(this.$t('Public key is missing'));
                 return;
             }
 
-            // Confirm payment with FluentCart
-            await this.confirmPayment(paymentResponse.payment_id);
+            this.#mp = new MercadoPago(this.#publicKey, {
+                locale: 'en-US'
+            });
 
+            this.#bricksBuilder = this.#mp.bricks();
+
+            // Clear previous content and add payment brick container
+            const container = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
+            if (container) {
+                const infoDivs = container.querySelectorAll('.fct-mercadopago-info');
+                infoDivs.forEach(div => div.remove());
+                
+                // Add brick container if it doesn't exist
+                if (!document.getElementById('mercadoPagoPaymentBrick_container')) {
+                    const brickContainer = document.createElement('div');
+                    brickContainer.id = 'mercadoPagoPaymentBrick_container';
+                    container.appendChild(brickContainer);
+                }
+            }
+
+            // For subscriptions, we only need card payments
+            this.#paymentBrickController = await this.#bricksBuilder.create('payment', 'mercadoPagoPaymentBrick_container', {
+                initialization: {
+                    amount: amount,
+                    payer: {
+                        email: paymentData.payer_email || '',
+                    },
+                },
+                customization: {
+                    visual: {
+                        style: {
+                            theme: 'default'
+                        }
+                    },
+                    paymentMethods: {
+                        types: {
+                            excluded: ['ticket', 'bank_transfer', 'atm'] // Only cards for subscriptions
+                        },
+                        maxInstallments: 1, // No installments for subscriptions
+                    }
+                },
+                callbacks: {
+                    onReady: () => {
+                        this.paymentLoader.hideLoader();
+                        this.paymentLoader.enableCheckoutButton(this.$t('Subscribe Now'));
+                    },
+                    onSubmit: async (formData) => {
+                        return await this.handlePaymentSubmit(formData, paymentData, transactionHash, 'subscription', planId);
+                    },
+                    onError: (error) => {
+                        console.error('Payment Brick error:', error);
+                        this.showError(error.message || this.$t('Something went wrong'));
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error('MercadoPago subscription initialization error:', error);
+            this.showError(error.message || this.$t('Failed to initialize subscription payment'));
+        }
+    }
+
+    async handlePaymentSubmit(formData, paymentData, transactionHash, intent = 'onetime', planId = null) {
+        this.paymentLoader.changeLoaderStatus('processing');
+        
+        try {
+            if (intent === 'subscription') {
+                // Handle subscription payment
+                await this.handleSubscriptionSubmit(formData, paymentData, transactionHash, planId);
+            } else {
+                // Handle one-time payment
+                await this.handleOnetimeSubmit(formData, paymentData, transactionHash);
+            }
         } catch (error) {
             console.error('Payment submission error:', error);
             this.showError(error.message || this.$t('Payment processing failed'));
             this.paymentLoader.hideLoader();
         }
+    }
+
+    async handleOnetimeSubmit(formData, paymentData, transactionHash) {
+        // Merge form data with payment data
+        const finalPaymentData = {
+            ...paymentData,
+            token: formData.token,
+            issuer_id: formData.issuer_id,
+            payment_method_id: formData.payment_method_id,
+            transaction_amount: formData.transaction_amount,
+            installments: formData.installments,
+            payer: {
+                ...paymentData.payer,
+                email: formData.payer.email,
+                identification: formData.payer.identification,
+            }
+        };
+
+        // Create payment via backend (secure)
+        const paymentResponse = await this.createPayment(finalPaymentData, transactionHash);
+
+        if (paymentResponse.error || !paymentResponse.payment_id) {
+            this.showError(paymentResponse.message || this.$t('Payment failed'));
+            this.paymentLoader.hideLoader();
+            return;
+        }
+
+        // Confirm payment with FluentCart
+        await this.confirmPayment(paymentResponse.payment_id);
+    }
+
+    async handleSubscriptionSubmit(formData, paymentData, transactionHash, planId) {
+        // For subscriptions, we use the card token to create a preapproval
+        const subscriptionData = {
+            ...paymentData,
+            card_token_id: formData.token,
+            payer: {
+                email: formData.payer.email,
+                identification: formData.payer.identification,
+            }
+        };
+
+        // Create subscription via backend
+        const subscriptionResponse = await this.createSubscription(subscriptionData, transactionHash);
+
+        if (subscriptionResponse.error || !subscriptionResponse.subscription_id) {
+            this.showError(subscriptionResponse.message || this.$t('Subscription creation failed'));
+            this.paymentLoader.hideLoader();
+            return;
+        }
+
+        // Confirm subscription with FluentCart
+        await this.confirmSubscription(subscriptionResponse.subscription_id, transactionHash);
     }
 
     async createPayment(paymentData, transactionHash) {
@@ -274,6 +378,82 @@ class MercadoPagoCheckout {
                 message: error.message
             };
         }
+    }
+
+    async createSubscription(subscriptionData, transactionHash) {
+        try {
+            // Send subscription data to backend to create preapproval securely
+            const params = new URLSearchParams({
+                action: 'fluent_cart_create_mercadopago_subscription',
+                transaction_hash: transactionHash,
+                subscription_data: JSON.stringify(subscriptionData),
+                mercadopago_fct_nonce: window.fct_mercadopago_data?.nonce
+            });
+
+            const response = await fetch(window.fluentcart_checkout_vars.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: params.toString()
+            });
+
+            return await response.json();
+        } catch (error) {
+            return {
+                error: true,
+                message: error.message
+            };
+        }
+    }
+
+    async confirmSubscription(subscriptionId, transactionHash) {
+        const params = new URLSearchParams({
+            action: 'fluent_cart_confirm_mercadopago_subscription',
+            subscription_id: subscriptionId,
+            transaction_hash: transactionHash,
+            mercadopago_fct_nonce: window.fct_mercadopago_data?.nonce
+        });
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', window.fluentcart_checkout_vars.ajaxurl, true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+        const that = this;
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const res = JSON.parse(xhr.responseText);
+                    if (res?.redirect_url) {
+                        that.paymentLoader.triggerPaymentCompleteEvent(res);
+                        that.paymentLoader?.changeLoaderStatus('redirecting');
+                        window.location.href = res.redirect_url;
+                    } else {
+                        that.showError(res?.message || that.$t('Subscription confirmation failed'));
+                        that.paymentLoader.hideLoader();
+                    }
+                } catch (error) {
+                    that.showError(error.message);
+                    that.paymentLoader.hideLoader();
+                }
+            } else {
+                that.showError(that.$t('Network error: ' + xhr.status));
+                that.paymentLoader.hideLoader();
+            }
+        };
+
+        xhr.onerror = function () {
+            try {
+                const err = JSON.parse(xhr.responseText);
+                that.showError(err?.message);
+            } catch (e) {
+                console.error('An error occurred:', e);
+                that.showError(e.message);
+            }
+            that.paymentLoader.hideLoader();
+        };
+
+        xhr.send(params.toString());
     }
 
     async confirmPayment(paymentId) {

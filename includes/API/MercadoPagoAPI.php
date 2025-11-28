@@ -1,11 +1,4 @@
 <?php
-/**
- * Mercado Pago API Handler
- *
- * @package MercadoPagoFluentCart
- * @since 1.0.0
- */
-
 
 namespace MercadoPagoFluentCart\API;
 

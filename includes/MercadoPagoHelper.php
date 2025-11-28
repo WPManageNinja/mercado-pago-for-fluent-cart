@@ -1,16 +1,11 @@
 <?php
-/**
- * Mercado Pago Helper Class
- *
- * @package MercadoPagoFluentCart
- * @since 1.0.0
- */
 
 namespace MercadoPagoFluentCart;
 
 use FluentCart\App\Helpers\Status;
 use FluentCart\App\Models\Order;
 use FluentCart\App\Models\OrderTransaction;
+use FluentCart\App\Services\DateTime\DateTime;
 use FluentCart\Framework\Support\Arr;
 
 if (!defined('ABSPATH')) {
@@ -19,9 +14,7 @@ if (!defined('ABSPATH')) {
 
 class MercadoPagoHelper
 {
-    /**
-     * Check if currency is supported by Mercado Pago
-     */
+    
     public static function checkCurrencySupport()
     {
         $supportedCurrencies = self::getSupportedCurrencies();
@@ -41,9 +34,7 @@ class MercadoPagoHelper
         return true;
     }
 
-    /**
-     * Get list of supported currencies
-     */
+
     public static function getSupportedCurrencies()
     {
         return [
@@ -58,9 +49,6 @@ class MercadoPagoHelper
         ];
     }
 
-    /**
-     * Get FluentCart subscription status from Mercado Pago status
-     */
     public static function getFctSubscriptionStatus($mercadoPagoStatus)
     {
         $statusMap = [
@@ -73,9 +61,7 @@ class MercadoPagoHelper
         return $statusMap[$mercadoPagoStatus] ?? Status::SUBSCRIPTION_PENDING;
     }
 
-    /**
-     * Get order from transaction hash
-     */
+
     public static function getOrderFromTransactionHash($transactionHash)
     {
         $transaction = OrderTransaction::query()
@@ -90,25 +76,19 @@ class MercadoPagoHelper
         return null;
     }
 
-    /**
-     * Format amount for Mercado Pago (some currencies require cents, others don't)
-     */
+
     public static function formatAmount($amount, $currency)
     {
-        // Currencies that don't use decimal points (0 decimal places)
         $zeroDecimalCurrencies = ['CLP'];
 
         if (in_array($currency, $zeroDecimalCurrencies)) {
             return (float) round($amount);
         }
 
-        // Default: 2 decimal places
         return (float) number_format($amount, 2, '.', '');
     }
 
-    /**
-     * Get payment type from Mercado Pago payment method
-     */
+ 
     public static function getPaymentType($paymentTypeId)
     {
         $typeMap = [
@@ -121,6 +101,30 @@ class MercadoPagoHelper
         ];
 
         return $typeMap[$paymentTypeId] ?? $paymentTypeId;
+    }
+
+  
+    public static function getSubscriptionUpdateData($subscriptionDetails, $subscriptionModel)
+    {
+        $status = self::getFctSubscriptionStatus(Arr::get($subscriptionDetails, 'status'));
+        
+        $updateData = [
+            'status' => $status,
+        ];
+
+        // Update next billing date if available
+        $nextPaymentDate = Arr::get($subscriptionDetails, 'next_payment_date');
+        if ($nextPaymentDate) {
+            $updateData['next_billing_date'] = DateTime::anyTimeToGmt($nextPaymentDate)->format('Y-m-d H:i:s');
+        }
+
+     
+        $payerId = Arr::get($subscriptionDetails, 'payer_id');
+        if ($payerId) {
+            $updateData['vendor_customer_id'] = $payerId;
+        }
+
+        return $updateData;
     }
 }
 

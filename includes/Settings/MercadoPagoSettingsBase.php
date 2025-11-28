@@ -1,11 +1,4 @@
 <?php
-/**
- * Mercado Pago Settings Base Class
- *
- * @package MercadoPagoFluentCart
- * @since 1.0.0
- */
-
 
 namespace MercadoPagoFluentCart\Settings;
 
