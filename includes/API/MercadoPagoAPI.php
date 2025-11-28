@@ -21,9 +21,6 @@ class MercadoPagoAPI
     private static $baseUrl = 'https://api.mercadopago.com/';
     private static $settings = null;
 
-    /**
-     * Get settings instance
-     */
     public static function getSettings()
     {
         if (!self::$settings) {
@@ -35,13 +32,11 @@ class MercadoPagoAPI
 
     private static function request($endpoint, $method = 'GET', $data = [])
     {
-        // Input validation
         if (empty($endpoint) || !is_string($endpoint)) {
             return new \WP_Error('invalid_endpoint', 'Invalid API endpoint provided');
         }
 
         
-        // Validate HTTP method
         $allowedMethods = ['GET', 'POST', 'PUT', 'DELETE'];
         if (!in_array(strtoupper($method), $allowedMethods, true)) {
             return new \WP_Error('invalid_method', 'Invalid HTTP method');

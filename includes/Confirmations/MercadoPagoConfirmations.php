@@ -10,7 +10,6 @@ use FluentCart\App\Models\Subscription;
 use FluentCart\App\Modules\Subscriptions\Services\SubscriptionService;
 use FluentCart\Framework\Support\Arr;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
-use MercadoPagoFluentCart\Subscriptions\MercadoPagoSubscriptions;
 
 class MercadoPagoConfirmations
 {

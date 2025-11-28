@@ -26,9 +26,6 @@ class MercadoPagoWebhook
         add_action('fluent_cart/payments/mercado_pago/webhook_subscription_authorized_payment', [$this, 'handleSubscriptionPayment'], 10, 1);
     }
 
-    /**
-     * Verify and process Mercado Pago webhook
-     */
     public function verifyAndProcess()
     {
         $payload = $this->getWebhookPayload();
