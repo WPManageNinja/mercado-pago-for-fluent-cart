@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" fill="none">
+  <!-- Background -->
+  <rect width="200" height="60" rx="8" fill="#009EE3"/>
+  
+  <!-- MP Text -->
+  <text x="100" y="38" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle">Mercado Pago</text>
+  
+  <!-- Simple icon representation -->
+  <circle cx="30" cy="30" r="12" fill="white" opacity="0.9"/>
+  <path d="M30 22 L30 38 M22 30 L38 30" stroke="#009EE3" stroke-width="3" stroke-linecap="round"/>
+</svg>
+
