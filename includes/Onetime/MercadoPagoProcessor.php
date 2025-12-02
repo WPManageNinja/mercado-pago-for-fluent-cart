@@ -26,6 +26,11 @@ class MercadoPagoProcessor
                 'email'      => $fcCustomer->email,
                 'first_name' => $fcCustomer->first_name,
                 'last_name'  => $fcCustomer->last_name,
+                'address' => [
+                    'zip_code'     => $order->billing_address->postal_code ?? '',
+                    'street_name'  => $order->billing_address->address_line_1 ?? '',
+                    'street_number' => '',
+                ]
             ],
             'notification_url'   => $this->getWebhookUrl(),
             'external_reference' => $transaction->uuid,
@@ -37,17 +42,6 @@ class MercadoPagoProcessor
             ]
         ];
 
-        if ($order->billing_address) {
-            $paymentData['additional_info'] = [
-                'payer' => [
-                    'address' => [
-                        'zip_code'     => $order->billing_address->postal_code ?? '',
-                        'street_name'  => $order->billing_address->address_line_1 ?? '',
-                        'street_number' => '',
-                    ]
-                ]
-            ];
-        }
 
         $paymentData = apply_filters('fluent_cart/mercadopago/onetime_payment_args', $paymentData, [
             'order'       => $order,

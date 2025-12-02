@@ -70,12 +70,17 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
     public function boot()
     {
-        // Initialize IPN handler
         (new Webhook\MercadoPagoWebhook())->init();
         
         add_filter('fluent_cart/payment_methods/mercado_pago_settings', [$this, 'getSettings'], 10, 2);
 
         (new Confirmations\MercadoPagoConfirmations())->init();
+
+        // Add custom checkout button support
+        add_filter('fluent_cart/payment_methods_with_custom_checkout_buttons', function ($methods) {
+            $methods[] = 'mercado_pago';
+            return $methods;
+        });
     }
 
     public function makePaymentFromPaymentInstance(PaymentInstance $paymentInstance)
@@ -98,13 +103,47 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
         $publicKey = (new Settings\MercadoPagoSettingsBase())->getPublicKey();
 
+        if (empty($publicKey)) {
+            $message = __('Please provide a valid Public Key!', 'mercado-pago-for-fluent-cart');
+            fluent_cart_add_log('Mercado Pago Credential Validation', $message, 'error', ['log_type' => 'payment']);
+            wp_send_json([
+                'status'  => 'failed',
+                'message' => __('No valid Public Key found!', 'mercado-pago-for-fluent-cart')
+            ], 422);
+        }
+
+        $cart = \FluentCart\App\Helpers\CartHelper::getCart();
+        $checkOutHelper = \FluentCart\App\Helpers\CartCheckoutHelper::make();
+        $shippingChargeData = (new \FluentCart\App\Hooks\Cart\WebCheckoutHandler())->getShippingChargeData($cart);
+        $shippingCharge = Arr::get($shippingChargeData, 'charge');
+        $totalPrice = $checkOutHelper->getItemsAmountTotal(false) + $shippingCharge;
+
+        $tax = $checkOutHelper->getCart()->checkout_data['tax_data'] ?? [];
+        if (Arr::get($tax, 'tax_behavior', 0) == 1) {
+            $totalPrice = $totalPrice + Arr::get($tax, 'tax_total', 0) + Arr::get($tax, 'shipping_tax', 0);
+        }
+
+        $items = $checkOutHelper->getItems();
+        $hasSubscription = $this->validateSubscriptions($items);
+
+        $paymentArgs['public_key'] = $publicKey;
+        $paymentArgs['locale'] = substr(determine_locale(), 0, 2); // Get just 'en' from 'en_US'
+
+        $paymentDetails = [
+            'mode'     => 'payment',
+            'amount'   => Helper::toDecimalWithoutComma($totalPrice),
+            'currency' => strtoupper(\FluentCart\Api\CurrencySettings::get('currency')),
+        ];
+
+        if ($hasSubscription) {
+            $paymentDetails['mode'] = 'subscription';
+        }
+
         wp_send_json([
             'status'       => 'success',
             'message'      => __('Order info retrieved!', 'mercado-pago-for-fluent-cart'),
-            'payment_args' => [
-                'public_key' => $publicKey
-
-            ],
+            'payment_args' => $paymentArgs,
+            'intent'       => $paymentDetails,
         ], 200);
     }
 
@@ -206,18 +245,30 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         $configureLink = 'https://www.mercadopago.com/developers/panel/app';
 
         return sprintf(
-            '<div>
+            '<div style="line-height: 1.8;">
                 <p><b>%s</b><code class="copyable-content">%s</code></p>
                 <p>%s</p>
+                <ol style="margin-left: 20px;">
+                    <li>%s</li>
+                    <li>%s</li>
+                    <li>%s</li>
+                    <li>%s</li>
+                </ol>
+                <p style="margin-top: 10px;"><b>%s</b> %s</p>
             </div>',
-            __('Webhook URL: ', 'mercado-pago-for-fluent-cart'),
+            __('Webhook URL:', 'mercado-pago-for-fluent-cart'),
             esc_html($webhook_url),
             sprintf(
-                /* translators: %s: Mercado Pago Developer Settings link */
-                __('Configure this webhook URL in your Mercado Pago Dashboard under Your integrations > Webhooks to receive payment notifications. You can access the <a href="%1$s" target="_blank">%2$s</a> here.', 'mercado-pago-for-fluent-cart'),
+                __('Configure webhooks in your <a href="%1$s" target="_blank">%2$s</a>:', 'mercado-pago-for-fluent-cart'),
                 esc_url($configureLink),
-                __('Mercado Pago Developer Settings Page', 'mercado-pago-for-fluent-cart')
-            )
+                __('Mercado Pago Developer Dashboard', 'mercado-pago-for-fluent-cart')
+            ),
+            __('Go to Your integrations > Select your application > Webhooks', 'mercado-pago-for-fluent-cart'),
+            __('Enter the webhook URL above in "Production mode URL" or "Test mode URL"', 'mercado-pago-for-fluent-cart'),
+            __('Select these events: <strong>Payments</strong>, <strong>Orders</strong>, and <strong>Plans and Subscriptions</strong>', 'mercado-pago-for-fluent-cart'),
+            __('Click Save - A <strong>secret signature</strong> will be generated', 'mercado-pago-for-fluent-cart'),
+            __('Important:', 'mercado-pago-for-fluent-cart'),
+            __('Copy the generated secret signature and paste it in the "Webhook Secret" field above (for the corresponding mode). This is required to verify webhook authenticity and security.', 'mercado-pago-for-fluent-cart')
         );
 
     }
@@ -250,6 +301,13 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                                 'type'        => 'password',
                                 'placeholder' => __('APP_USR-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'mercado-pago-for-fluent-cart'),
                             ],
+                            'live_webhook_secret' => [
+                                'value'       => '',
+                                'label'       => __('Live Webhook Secret', 'mercado-pago-for-fluent-cart'),
+                                'type'        => 'password',
+                                'placeholder' => __('Your webhook secret signature', 'mercado-pago-for-fluent-cart'),
+                                'help'        => __('Found in Your integrations > Webhooks section. Used to verify webhook authenticity.', 'mercado-pago-for-fluent-cart'),
+                            ],
                         ]
                     ],
                     [
@@ -268,6 +326,13 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                                 'label'       => __('Test Access Token', 'mercado-pago-for-fluent-cart'),
                                 'type'        => 'password',
                                 'placeholder' => __('TEST-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'mercado-pago-for-fluent-cart'),
+                            ],
+                            'test_webhook_secret' => [
+                                'value'       => '',
+                                'label'       => __('Test Webhook Secret', 'mercado-pago-for-fluent-cart'),
+                                'type'        => 'password',
+                                'placeholder' => __('Your webhook secret signature', 'mercado-pago-for-fluent-cart'),
+                                'help'        => __('Found in Your integrations > Webhooks section. Used to verify webhook authenticity.', 'mercado-pago-for-fluent-cart'),
                             ],
                         ],
                     ],
@@ -292,8 +357,14 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
         if ($mode == 'test') {
             $data['test_access_token'] = Helper::encryptKey($data['test_access_token']);
+            if (!empty($data['test_webhook_secret'])) {
+                $data['test_webhook_secret'] = Helper::encryptKey($data['test_webhook_secret']);
+            }
         } else {
             $data['live_access_token'] = Helper::encryptKey($data['live_access_token']);
+            if (!empty($data['live_webhook_secret'])) {
+                $data['live_webhook_secret'] = Helper::encryptKey($data['live_webhook_secret']);
+            }
         }
 
         return $data;
