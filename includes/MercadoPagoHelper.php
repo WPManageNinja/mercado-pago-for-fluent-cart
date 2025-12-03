@@ -5,20 +5,21 @@ namespace MercadoPagoFluentCart;
 use FluentCart\App\Helpers\Status;
 use FluentCart\App\Models\Order;
 use FluentCart\App\Models\OrderTransaction;
+use FluentCart\Api\CurrencySettings;
 use FluentCart\App\Services\DateTime\DateTime;
 use FluentCart\Framework\Support\Arr;
 
 if (!defined('ABSPATH')) {
-    exit; // Direct access not allowed.
+    exit;
 }
 
 class MercadoPagoHelper
 {
     
-    public static function checkCurrencySupport()
+    public static function checkCurrencySupport($currency = '')
     {
         $supportedCurrencies = self::getSupportedCurrencies();
-        $currentCurrency = fluent_cart_get_currency();
+        $currentCurrency = strtoupper($currency) ?? CurrencySettings::get('currency');
 
         if (!in_array($currentCurrency, $supportedCurrencies)) {
             wp_send_json([

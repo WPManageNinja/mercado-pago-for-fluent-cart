@@ -1,5 +1,5 @@
 === Mercado Pago for FluentCart ===
-Contributors: fluentcart
+Contributors: fluentcart, akmelias
 Tags: mercado pago, payment gateway, fluent cart, ecommerce, payments
 Requires at least: 5.6
 Tested up to: 6.8

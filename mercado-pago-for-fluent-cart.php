@@ -25,7 +25,7 @@ define('MERCADOPAGO_FCT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MERCADOPAGO_FCT_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 
-function mercadopago_fc_check_dependencies() {
+function mercadopago_fct_check_dependencies() {
     if (!defined('FLUENTCART_VERSION')) {
         add_action('admin_notices', function() {
             ?>
@@ -59,7 +59,7 @@ function mercadopago_fc_check_dependencies() {
 
 
 add_action('plugins_loaded', function() {
-    if (!mercadopago_fc_check_dependencies()) {
+    if (!mercadopago_fct_check_dependencies()) {
         return;
     }
 
@@ -87,15 +87,11 @@ add_action('plugins_loaded', function() {
 }, 20);
 
 
-// Activation and deactivation hooks
-register_activation_hook(__FILE__, 'mercadopago_fc_on_activation');
-register_deactivation_hook(__FILE__, 'mercadopago_fc_on_deactivation');
+register_activation_hook(file: __FILE__, callback: 'mercadopago_fct_on_activation');
+register_deactivation_hook(file: __FILE__, callback: 'mercadopago_fct_on_deactivation');
 
-/**
- * Plugin activation callback
- */
-function mercadopago_fc_on_activation() {
-    if (!mercadopago_fc_check_dependencies()) {
+function mercadopago_fct_on_activation() {
+    if (!mercadopago_fct_check_dependencies()) {
         deactivate_plugins(plugin_basename(__FILE__));
         wp_die(
             esc_html__('Mercado Pago for FluentCart requires FluentCart to be installed and activated.', 'mercado-pago-for-fluent-cart'),
@@ -104,7 +100,6 @@ function mercadopago_fc_on_activation() {
         );
     }
     
-    // Set default options
     $default_options = [
         'MERCADOPAGO_FCT_VERSION' => MERCADOPAGO_FCT_VERSION,
         'mercadopago_fct_installed_time' => current_time('timestamp'),
@@ -114,30 +109,19 @@ function mercadopago_fc_on_activation() {
         add_option($option, $value);
     }
     
-    // Clear any relevant caches
     if (function_exists('wp_cache_flush')) {
         wp_cache_flush();
     }
 }
 
-/**
- * Plugin deactivation callback
- */
-function mercadopago_fc_on_deactivation() {
-    // Clear transients
-    delete_transient('mercadopago_fc_api_status');
+
+function mercadopago_fct_on_deactivation() {
+
+    delete_transient('mercadopago_fct_api_status');
     
-    // Clear wp_cache if object caching is enabled
     if (function_exists('wp_cache_flush_group')) {
-        wp_cache_flush_group('mercadopago_fc');
+        wp_cache_flush_group('mercadopago_fct');
     }
     
-    // Note: We do not delete options or user data on deactivation
-    // Only on uninstall (handled in uninstall.php)
 }
-
-// Legacy activation hook for backward compatibility
-register_activation_hook(__FILE__, function() {
-    mercadopago_fc_on_activation();
-});
 

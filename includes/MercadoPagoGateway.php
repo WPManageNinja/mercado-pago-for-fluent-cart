@@ -6,6 +6,7 @@ namespace MercadoPagoFluentCart;
 use FluentCart\App\Helpers\Helper;
 use FluentCart\App\Helpers\Status;
 use FluentCart\Framework\Support\Arr;
+use FluentCart\Api\CurrencySettings;
 use FluentCart\App\Services\Payments\PaymentInstance;
 use FluentCart\App\Modules\PaymentMethods\Core\AbstractPaymentGateway;
 use FluentCart\App\Services\PluginInstaller\PaymentAddonManager;
@@ -14,7 +15,7 @@ use MercadoPagoFluentCart\Subscriptions\MercadoPagoSubscriptions;
 use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
 
 if (!defined('ABSPATH')) {
-    exit; // Direct access not allowed.
+    exit;
 }
 
 class MercadoPagoGateway extends AbstractPaymentGateway
@@ -127,7 +128,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         $hasSubscription = $this->validateSubscriptions($items);
 
         $paymentArgs['public_key'] = $publicKey;
-        $paymentArgs['locale'] = substr(determine_locale(), 0, 2); // Get just 'en' from 'en_US'
+        $paymentArgs['locale'] = determine_locale();   
 
         $paymentDetails = [
             'mode'     => 'payment',
@@ -353,18 +354,12 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
     public static function beforeSettingsUpdate($data, $oldSettings): array
     {
-        $mode = Arr::get($data, 'payment_mode', 'test');
+        $mode = Arr::get($data, 'payment_mode', 'live');
 
         if ($mode == 'test') {
             $data['test_access_token'] = Helper::encryptKey($data['test_access_token']);
-            if (!empty($data['test_webhook_secret'])) {
-                $data['test_webhook_secret'] = Helper::encryptKey($data['test_webhook_secret']);
-            }
         } else {
             $data['live_access_token'] = Helper::encryptKey($data['live_access_token']);
-            if (!empty($data['live_webhook_secret'])) {
-                $data['live_webhook_secret'] = Helper::encryptKey($data['live_webhook_secret']);
-            }
         }
 
         return $data;
