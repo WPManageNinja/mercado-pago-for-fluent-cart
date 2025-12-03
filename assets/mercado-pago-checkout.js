@@ -211,6 +211,11 @@ class MercadoPagoCheckout {
 
         try {
             this.paymentBrickController = await this.bricksBuilder.create('payment', 'paymentBrick_container', settings);
+            window.dispatchEvent(new CustomEvent('fluent_cart_payment_method_loading_success', {
+                detail: {
+                    payment_method: 'mercado_pago'
+                }
+            }));
         } catch (error) {
             console.error('Error creating Payment Brick:', error);
             this.showError(this.$t('Failed to initialize payment form'));
@@ -245,11 +250,6 @@ class MercadoPagoCheckout {
             },
             callbacks: {
                 onReady: () => {
-                    window.dispatchEvent(new CustomEvent('fluent_cart_payment_method_loading_success', {
-                        detail: {
-                            payment_method: 'mercado_pago'
-                        }
-                    }));
                     const loadingElement = document.getElementById('fct_loading_payment_processor');
                     if (loadingElement) {
                         loadingElement.remove();
@@ -357,6 +357,11 @@ class MercadoPagoCheckout {
 
         try {
             this.paymentBrickController = await this.bricksBuilder.create('payment', 'paymentBrick_container', settings);
+            window.dispatchEvent(new CustomEvent('fluent_cart_payment_method_loading_success', {
+                detail: {
+                    payment_method: 'mercado_pago'
+                }
+            }));
         } catch (error) {
             console.error('Error creating Payment Brick:', error);
             this.showError(this.$t('Failed to initialize payment form'));
@@ -377,7 +382,6 @@ class MercadoPagoCheckout {
 
         const mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
         if (mercadoPagoContainer) {
-            // Remove existing error messages
             const existingError = mercadoPagoContainer.querySelector('.fct-error-message');
             if (existingError) {
                 existingError.remove();
@@ -402,7 +406,6 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
 
     addLoadingText();
 
-    // Fetch payment info from backend (similar to PayPal)
     fetch(e.detail.paymentInfoUrl, {
         method: "POST",
         headers: {

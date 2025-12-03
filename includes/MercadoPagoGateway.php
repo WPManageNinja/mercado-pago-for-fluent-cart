@@ -6,7 +6,10 @@ namespace MercadoPagoFluentCart;
 use FluentCart\App\Helpers\Helper;
 use FluentCart\App\Helpers\Status;
 use FluentCart\Framework\Support\Arr;
+use FluentCart\App\Helpers\CartHelper;
+use FluentCart\App\Helpers\CartCheckoutHelper;
 use FluentCart\Api\CurrencySettings;
+use FluentCart\App\Hooks\Cart\WebCheckoutHandler;
 use FluentCart\App\Services\Payments\PaymentInstance;
 use FluentCart\App\Modules\PaymentMethods\Core\AbstractPaymentGateway;
 use FluentCart\App\Services\PluginInstaller\PaymentAddonManager;
@@ -113,9 +116,9 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             ], 422);
         }
 
-        $cart = \FluentCart\App\Helpers\CartHelper::getCart();
-        $checkOutHelper = \FluentCart\App\Helpers\CartCheckoutHelper::make();
-        $shippingChargeData = (new \FluentCart\App\Hooks\Cart\WebCheckoutHandler())->getShippingChargeData($cart);
+        $cart = CartHelper::getCart();
+        $checkOutHelper = CartCheckoutHelper::make();
+        $shippingChargeData = (new WebCheckoutHandler())->getShippingChargeData($cart);
         $shippingCharge = Arr::get($shippingChargeData, 'charge');
         $totalPrice = $checkOutHelper->getItemsAmountTotal(false) + $shippingCharge;
 
@@ -133,7 +136,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         $paymentDetails = [
             'mode'     => 'payment',
             'amount'   => Helper::toDecimalWithoutComma($totalPrice),
-            'currency' => strtoupper(\FluentCart\Api\CurrencySettings::get('currency')),
+            'currency' => strtoupper(CurrencySettings::get('currency')),
         ];
 
         if ($hasSubscription) {
