@@ -39,6 +39,7 @@ class MercadoPagoSettingsBase extends BaseGatewaySettings
             'test_access_token'  => '',
             'live_public_key'    => '',
             'live_access_token'  => '',
+            'checkout_type'      => 'modal',
             'payment_mode'       => 'test',
         ];
     }

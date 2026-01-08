@@ -1,0 +1,35 @@
+.fluent-cart-checkout_embed_payment_container .mp-checkout-bricks__payment-form h1 {
+   padding-top: 0 !important;
+    
+}
+.fluent-cart-checkout_embed_payment_container .mp-checkout-bricks__payment-form {
+    padding: 0 !important;
+}
+.fluent-cart-checkout_embed_payment_container #paymentBrick_container {
+    border: 0;
+    box-shadow: none;
+}
+.fluent-cart-checkout_embed_payment_container .mp-checkout-bricks__payment-form input,
+.fluent-cart-checkout_embed_payment_container .mp-checkout-bricks__payment-form input:focus {
+    opacity: 1;
+    position: relative;
+    border-radius: var(--border-radius-medium);
+    padding: var(--input-vertical-padding) var(--input-horizontal-padding);
+    border: var(--input-border-width) solid var(--outline-primary-color);
+    min-height: auto;
+}
+.fluent-cart-checkout_embed_payment_container .mp-checkout-bricks__payment-form select {
+    background-image: none;
+}
+.fluent-cart-checkout_embed_payment_container .mp-checkout-bricks__payment-form input[type=radio] {
+    margin: 0px;
+    min-height: auto;
+    height: var(--height-small);
+    width: var(--width-small);
+    border-width: 2px;
+    border-radius: var(--border-radius-full);
+    padding: 0px;
+}
+.fluent-cart-checkout_embed_payment_container .mp-checkout-bricks__payment-form label {
+    padding: 0px;
+}

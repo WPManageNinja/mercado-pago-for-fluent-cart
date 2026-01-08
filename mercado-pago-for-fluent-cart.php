@@ -87,8 +87,7 @@ add_action('plugins_loaded', function() {
 }, 20);
 
 
-register_activation_hook(file: __FILE__, callback: 'mercadopago_fct_on_activation');
-register_deactivation_hook(file: __FILE__, callback: 'mercadopago_fct_on_deactivation');
+register_activation_hook( __FILE__,  'mercadopago_fct_on_activation');
 
 function mercadopago_fct_on_activation() {
     if (!mercadopago_fct_check_dependencies()) {
@@ -114,14 +113,4 @@ function mercadopago_fct_on_activation() {
     }
 }
 
-
-function mercadopago_fct_on_deactivation() {
-
-    delete_transient('mercadopago_fct_api_status');
-    
-    if (function_exists('wp_cache_flush_group')) {
-        wp_cache_flush_group('mercadopago_fct');
-    }
-    
-}
 

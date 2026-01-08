@@ -46,28 +46,28 @@ class MercadoPagoGateway extends AbstractPaymentGateway
     {
         $logo = MERCADOPAGO_FCT_PLUGIN_URL . 'assets/images/mercado-pago-logo.svg';
         $addonStatus = PaymentAddonManager::getAddonStatus($this->addonSlug, $this->addonFile);
-        
+
         return [
-            'title'              => __('Mercado Pago', 'mercado-pago-for-fluent-cart'),
-            'route'              => $this->methodSlug,
-            'slug'               => $this->methodSlug,
-            'label'              => 'Mercado Pago',
-            'admin_title'        => 'Mercado Pago',
-            'description'        => __('Pay securely with Mercado Pago - Card, Pix, Boleto, and more', 'mercado-pago-for-fluent-cart'),
-            'logo'               => $logo,
+            'title' => __('Mercado Pago', 'mercado-pago-for-fluent-cart'),
+            'route' => $this->methodSlug,
+            'slug' => $this->methodSlug,
+            'label' => 'Mercado Pago',
+            'admin_title' => 'Mercado Pago',
+            'description' => __('Pay securely with Mercado Pago - Card, Pix, Boleto, and more', 'mercado-pago-for-fluent-cart'),
+            'logo' => $logo,
             'tag' => 'beta',
-            'icon'               => $logo,
-            'brand_color'        => '#009EE3',
-            'status'             => $this->settings->get('is_active') === 'yes',
-            'upcoming'           => false,
-            'is_addon'           => true,
-            'addon_source'       => [
+            'icon' => $logo,
+            'brand_color' => '#009EE3',
+            'status' => $this->settings->get('is_active') === 'yes',
+            'upcoming' => false,
+            'is_addon' => true,
+            'addon_source' => [
                 'type' => 'github',
                 'link' => 'https://github.com/WPManageNinja/mercado-pago-for-fluent-cart/releases/latest',
                 'slug' => $this->addonSlug,
                 'file' => $this->addonFile
             ],
-            'addon_status'       => $addonStatus,
+            'addon_status' => $addonStatus,
             'supported_features' => $this->supportedFeatures,
         ];
     }
@@ -75,7 +75,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
     public function boot()
     {
         (new Webhook\MercadoPagoWebhook())->init();
-        
+
         add_filter('fluent_cart/payment_methods/mercado_pago_settings', [$this, 'getSettings'], 10, 2);
 
         (new Confirmations\MercadoPagoConfirmations())->init();
@@ -91,7 +91,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
     {
         $paymentArgs = [
             'success_url' => $this->getSuccessUrl($paymentInstance->transaction),
-            'cancel_url'  => $this->getCancelUrl(),
+            'cancel_url' => $this->getCancelUrl(),
         ];
 
         if ($paymentInstance->subscription) {
@@ -103,7 +103,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
     public function getOrderInfo($data)
     {
-        MercadoPagoHelper::checkCurrencySupport();
+        MercadoPagoHelper::checkCurrencySupport(CurrencySettings::get('currency'));
 
         $publicKey = (new Settings\MercadoPagoSettingsBase())->getPublicKey();
 
@@ -111,7 +111,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             $message = __('Please provide a valid Public Key!', 'mercado-pago-for-fluent-cart');
             fluent_cart_add_log('Mercado Pago Credential Validation', $message, 'error', ['log_type' => 'payment']);
             wp_send_json([
-                'status'  => 'failed',
+                'status' => 'failed',
                 'message' => __('No valid Public Key found!', 'mercado-pago-for-fluent-cart')
             ], 422);
         }
@@ -131,12 +131,13 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         $hasSubscription = $this->validateSubscriptions($items);
 
         $paymentArgs['public_key'] = $publicKey;
-        $paymentArgs['locale'] = determine_locale();   
+        $paymentArgs['locale'] = determine_locale();
 
         $paymentDetails = [
-            'mode'     => 'payment',
-            'amount'   => Helper::toDecimalWithoutComma($totalPrice),
+            'mode' => 'payment',
+            'amount' => Helper::toDecimalWithoutComma($totalPrice),
             'currency' => strtoupper(CurrencySettings::get('currency')),
+            'payer_email' => $cart->customer->email ?? ''
         ];
 
         if ($hasSubscription) {
@@ -144,10 +145,10 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         }
 
         wp_send_json([
-            'status'       => 'success',
-            'message'      => __('Order info retrieved!', 'mercado-pago-for-fluent-cart'),
+            'status' => 'success',
+            'message' => __('Order info retrieved!', 'mercado-pago-for-fluent-cart'),
             'payment_args' => $paymentArgs,
-            'intent'       => $paymentDetails,
+            'intent' => $paymentDetails,
         ], 200);
     }
 
@@ -162,20 +163,26 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         return [
             [
                 'handle' => 'mercadopago-sdk-js',
-                'src'    => 'https://sdk.mercadopago.com/js/v2',
+                'src' => 'https://sdk.mercadopago.com/js/v2',
             ],
             [
                 'handle' => 'mercadopago-fluent-cart-checkout-handler',
-                'src'    => MERCADOPAGO_FCT_PLUGIN_URL . 'assets/mercado-pago-checkout.js',
+                'src' => MERCADOPAGO_FCT_PLUGIN_URL . 'assets/mercado-pago-checkout.js',
                 'version' => MERCADOPAGO_FCT_VERSION,
-                'deps'   => ['mercadopago-sdk-js']
+                'deps' => ['mercadopago-sdk-js']
             ]
         ];
     }
 
     public function getEnqueueStyleSrc(): array
     {
-        return [];
+        return [
+            [
+                'handle' => 'mercadopago-fluent-cart-checkout-styles',
+                'src' => MERCADOPAGO_FCT_PLUGIN_URL . 'assets/mercado-pago-checkout.css',
+                'version' => MERCADOPAGO_FCT_VERSION,
+            ]
+        ];
     }
 
     public function getLocalizeData(): array
@@ -244,7 +251,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
     }
 
     public function getWebhookInstructions(): string
-    { 
+    {
         $webhook_url = site_url('?fluent-cart=fct_payment_listener_ipn&method=mercado_pago');
         $configureLink = 'https://www.mercadopago.com/developers/panel/app';
 
@@ -283,60 +290,60 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'notice' => [
                 'value' => $this->renderStoreModeNotice(),
                 'label' => __('Store Mode notice', 'mercado-pago-for-fluent-cart'),
-                'type'  => 'notice'
+                'type' => 'notice'
             ],
             'payment_mode' => [
-                'type'   => 'tabs',
+                'type' => 'tabs',
                 'schema' => [
                     [
-                        'type'   => 'tab',
-                        'label'  => __('Live credentials', 'mercado-pago-for-fluent-cart'),
-                        'value'  => 'live',
+                        'type' => 'tab',
+                        'label' => __('Live credentials', 'mercado-pago-for-fluent-cart'),
+                        'value' => 'live',
                         'schema' => [
                             'live_public_key' => [
-                                'value'       => '',
-                                'label'       => __('Live Public Key', 'mercado-pago-for-fluent-cart'),
-                                'type'        => 'text',
+                                'value' => '',
+                                'label' => __('Live Public Key', 'mercado-pago-for-fluent-cart'),
+                                'type' => 'text',
                                 'placeholder' => __('APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', 'mercado-pago-for-fluent-cart'),
                             ],
                             'live_access_token' => [
-                                'value'       => '',
-                                'label'       => __('Live Access Token', 'mercado-pago-for-fluent-cart'),
-                                'type'        => 'password',
+                                'value' => '',
+                                'label' => __('Live Access Token', 'mercado-pago-for-fluent-cart'),
+                                'type' => 'password',
                                 'placeholder' => __('APP_USR-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'mercado-pago-for-fluent-cart'),
                             ],
                             'live_webhook_secret' => [
-                                'value'       => '',
-                                'label'       => __('Live Webhook Secret', 'mercado-pago-for-fluent-cart'),
-                                'type'        => 'password',
+                                'value' => '',
+                                'label' => __('Live Webhook Secret', 'mercado-pago-for-fluent-cart'),
+                                'type' => 'password',
                                 'placeholder' => __('Your webhook secret signature', 'mercado-pago-for-fluent-cart'),
-                                'help'        => __('Found in Your integrations > Webhooks section. Used to verify webhook authenticity.', 'mercado-pago-for-fluent-cart'),
+                                'help' => __('Found in Your integrations > Webhooks section. Used to verify webhook authenticity.', 'mercado-pago-for-fluent-cart'),
                             ],
                         ]
                     ],
                     [
-                        'type'   => 'tab',
-                        'label'  => __('Test credentials', 'mercado-pago-for-fluent-cart'),
-                        'value'  => 'test',
+                        'type' => 'tab',
+                        'label' => __('Test credentials', 'mercado-pago-for-fluent-cart'),
+                        'value' => 'test',
                         'schema' => [
                             'test_public_key' => [
-                                'value'       => '',
-                                'label'       => __('Test Public Key', 'mercado-pago-for-fluent-cart'),
-                                'type'        => 'text',
+                                'value' => '',
+                                'label' => __('Test Public Key', 'mercado-pago-for-fluent-cart'),
+                                'type' => 'text',
                                 'placeholder' => __('TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', 'mercado-pago-for-fluent-cart'),
                             ],
                             'test_access_token' => [
-                                'value'       => '',
-                                'label'       => __('Test Access Token', 'mercado-pago-for-fluent-cart'),
-                                'type'        => 'password',
+                                'value' => '',
+                                'label' => __('Test Access Token', 'mercado-pago-for-fluent-cart'),
+                                'type' => 'password',
                                 'placeholder' => __('TEST-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'mercado-pago-for-fluent-cart'),
                             ],
                             'test_webhook_secret' => [
-                                'value'       => '',
-                                'label'       => __('Test Webhook Secret', 'mercado-pago-for-fluent-cart'),
-                                'type'        => 'password',
+                                'value' => '',
+                                'label' => __('Test Webhook Secret', 'mercado-pago-for-fluent-cart'),
+                                'type' => 'password',
                                 'placeholder' => __('Your webhook secret signature', 'mercado-pago-for-fluent-cart'),
-                                'help'        => __('Found in Your integrations > Webhooks section. Used to verify webhook authenticity.', 'mercado-pago-for-fluent-cart'),
+                                'help' => __('Found in Your integrations > Webhooks section. Used to verify webhook authenticity.', 'mercado-pago-for-fluent-cart'),
                             ],
                         ],
                     ],
@@ -345,7 +352,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'webhook_info' => [
                 'value' => $this->getWebhookInstructions(),
                 'label' => __('Webhook Configuration', 'mercado-pago-for-fluent-cart'),
-                'type'  => 'html_attr'
+                'type' => 'html_attr'
             ],
         ];
     }
