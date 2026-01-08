@@ -16,6 +16,7 @@ use FluentCart\App\Services\PluginInstaller\PaymentAddonManager;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 use MercadoPagoFluentCart\Subscriptions\MercadoPagoSubscriptions;
 use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
+use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -135,7 +136,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
         $paymentDetails = [
             'mode' => 'payment',
-            'amount' => Helper::toDecimalWithoutComma($totalPrice),
+            'amount' => MercadoPagoHelper::formatAmount($totalPrice, CurrencySettings::get('currency')),
             'currency' => strtoupper(CurrencySettings::get('currency')),
             'payer_email' => $cart->customer->email ?? ''
         ];
@@ -143,6 +144,26 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         if ($hasSubscription) {
             $paymentDetails['mode'] = 'subscription';
         }
+
+        $availablePaymentMethods = MercadoPagoAPI::getMercadoPagoObject('v1/payment_methods');
+
+
+       // create preference
+       $preference = MercadoPagoAPI::createMercadoPagoObject('/checkout/preferences', [
+        'items' => [
+            [
+                'title' => 'Test Item',
+                'quantity' => 1,
+                'unit_price' => 100,
+            ]
+        ]
+       ]);
+
+
+
+      if (!is_wp_error($preference)) {
+        $paymentArgs['preference_id'] = Arr::get($preference, 'id', '');
+      }
 
         wp_send_json([
             'status' => 'success',

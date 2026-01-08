@@ -70,7 +70,8 @@ class MercadoPagoCheckout {
 
         const settings = {
             initialization: {
-                amount: parseFloat(this.data?.intent?.amount || 0),
+                amount: Number(this.data?.intent?.amount || 0),
+                preferenceId: this.data?.payment_args?.preference_id || '',
             },
             customization: {
                 visual: {
@@ -79,13 +80,12 @@ class MercadoPagoCheckout {
                     },
                 },
                 paymentMethods: {
-                    creditCard: 'all',
-                    debitCard: 'all',
-                    ticket: 'all',
-                    bankTransfer: 'all',
-                    onboarding_credits: 'all',
-                    wallet_purchase: 'all',
-                    maxInstallments: 1
+                    ticket: "all",
+                    bankTransfer: "all",
+                    creditCard: "all",
+                    prepaidCard: "all",
+                    debitCard: "all",
+                    mercadoPago: "all",
                 },
             },
             callbacks: {
@@ -105,18 +105,24 @@ class MercadoPagoCheckout {
 
                     return new Promise(async (resolve, reject) => {
                         try {
+                            // Append Mercado Pago formData to the main FluentCart form
+                            // This makes it available in the backend via orderHandler
+                            that.appendMercadoPagoFormDataToMainForm(formData);
+
                             // First, create the order in FluentCart
                             if (typeof ref.orderHandler === 'function') {
                                 const response = await ref.orderHandler();
                                 if (!response) {
                                     that.paymentLoader?.changeLoaderStatus(that.$t('Order creation failed'));
                                     that.paymentLoader?.hideLoader();
+                                    that.cleanupMercadoPagoFormData();
                                     return reject();
                                 }
                                 orderData = response;
                             } else {
                                 that.paymentLoader?.changeLoaderStatus(that.$t('Not proper order handler'));
                                 that.paymentLoader?.hideLoader();
+                                that.cleanupMercadoPagoFormData();
                                 return reject();
                             }
 
@@ -175,19 +181,23 @@ class MercadoPagoCheckout {
                                         };
 
                                         xhr.send(confirmParams.toString());
+                                        that.cleanupMercadoPagoFormData();
                                         resolve();
                                     } else {
                                         that.showError(that.$t('Payment not approved'));
+                                        that.cleanupMercadoPagoFormData();
                                         reject();
                                     }
                                 })
                                 .catch((error) => {
                                     console.error('Payment error:', error);
                                     that.showError(error?.message || that.$t('Payment failed'));
+                                    that.cleanupMercadoPagoFormData();
                                     reject();
                                 });
                         } catch (error) {
                             console.error('Error:', error);
+                            that.cleanupMercadoPagoFormData();
                             reject();
                         }
                     });
@@ -222,6 +232,43 @@ class MercadoPagoCheckout {
             that.showError(that.$t('Failed to initialize mercado pago payment form'));
             return;
         }
+    }
+
+    appendMercadoPagoFormDataToMainForm(formData) {
+        // Remove any existing Mercado Pago form data field first
+        this.cleanupMercadoPagoFormData();
+
+        if (!formData || typeof formData !== 'object') {
+            return;
+        }
+
+        // Create a single hidden field with JSON stringified formData
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'mp_form_data';
+        input.value = JSON.stringify(formData);
+        input.className = 'fct-mercadopago-form-data';
+        this.form.appendChild(input);
+
+        // Store reference for cleanup
+        this.mercadoPagoFormField = input;
+    }
+
+
+    cleanupMercadoPagoFormData() {
+        // Remove the stored field reference
+        if (this.mercadoPagoFormField && this.mercadoPagoFormField.parentNode) {
+            this.mercadoPagoFormField.parentNode.removeChild(this.mercadoPagoFormField);
+            this.mercadoPagoFormField = null;
+        }
+
+        // Also remove any fields that might have been left behind
+        const existingFields = this.form.querySelectorAll('.fct-mercadopago-form-data');
+        existingFields.forEach(field => {
+            if (field && field.parentNode) {
+                field.parentNode.removeChild(field);
+            }
+        });
     }
 
     showError(message) {

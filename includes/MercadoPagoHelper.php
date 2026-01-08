@@ -127,5 +127,28 @@ class MercadoPagoHelper
 
         return $updateData;
     }
+
+    public static function formatPayerInfo($fcCustomer, $billingAddress)
+    {
+       $payerInfo = [
+        'first_name' => $fcCustomer->first_name,
+        'last_name'  => $fcCustomer->last_name,
+       ];
+
+
+        if ($billingAddress) {
+            $payerInfo['address'] = [
+                'zip_code'     => $billingAddress->postal_code ?? '',
+                'street_name'  => $billingAddress->address_line_1 ?? '',
+                'city'         => $billingAddress->city ?? '',
+                'state'        => $billingAddress->state ?? '',
+                'country'      => $billingAddress->country ?? '',
+                'street_number' => '',
+            ];
+        }
+       
+
+       return $payerInfo;
+    }
 }
 

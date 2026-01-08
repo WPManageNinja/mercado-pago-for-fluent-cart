@@ -5,41 +5,59 @@ namespace MercadoPagoFluentCart\Onetime;
 use FluentCart\App\Services\Payments\PaymentInstance;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 use MercadoPagoFluentCart\MercadoPagoHelper;
+use FluentCart\App\App;
+use FluentCart\App\Helpers\Helper;
+use FluentCart\App\Helpers\AddressHelper;
 use FluentCart\Framework\Support\Arr;
 
 class MercadoPagoProcessor
 {
     public function handleSinglePayment(PaymentInstance $paymentInstance, $paymentArgs = [])
     {
+        $mpFormData = Arr::get(App::request()->all(), 'mp_form_data', '');
+        if (empty($mpFormData)) {
+            return new \WP_Error(
+                'mercado_pago_form_data_missing',
+                __('Mercado Pago form data is missing', 'mercado-pago-for-fluent-cart'),
+                ['response' => $mpFormData]
+            );
+        }
+
+        $mpFormData = json_decode($mpFormData, true);
+
+        $ipAddress = AddressHelper::getIpAddress();
+
+        if (is_wp_error($mpFormData)) {
+            return $mpFormData;
+        }
+
         $order = $paymentInstance->order;
         $transaction = $paymentInstance->transaction;
         $fcCustomer = $paymentInstance->order->customer;
 
         // Format amount based on currency
         $amount = MercadoPagoHelper::formatAmount($transaction->total, $transaction->currency);
+        $payerInfo = MercadoPagoHelper::formatPayerInfo($fcCustomer, $order->billing_address);
 
         $paymentData = [
-            'transaction_amount' => $amount,
-            'description'        => sprintf(__('Order #%s', 'mercado-pago-for-fluent-cart'), $order->id),
-            'payment_method_id'  => 'pix', // Will be determined by frontend
-            'payer'              => [
-                'email'      => $fcCustomer->email,
-                'first_name' => $fcCustomer->first_name,
-                'last_name'  => $fcCustomer->last_name,
-                'address' => [
-                    'zip_code'     => $order->billing_address->postal_code ?? '',
-                    'street_name'  => $order->billing_address->address_line_1 ?? '',
-                    'street_number' => '',
+            'x-idempotency-key' => $transaction->uuid,
+            'additional_info' => [
+                'ip-address' => $ipAddress,
+                'payer' => [
+                    'first_name' => $fcCustomer->first_name,
+                    'last_name' => $fcCustomer->last_name,
                 ]
             ],
-            'notification_url'   => $this->getWebhookUrl(),
-            'external_reference' => $transaction->uuid,
-            'metadata'           => [
-                'order_id'         => $order->id,
-                'order_hash'       => $order->uuid,
-                'transaction_hash' => $transaction->uuid,
-                'customer_name'    => $fcCustomer->first_name . ' ' . $fcCustomer->last_name,
-            ]
+            'payer' => [
+                'email' => $fcCustomer->email,
+                'first_name' => $fcCustomer->first_name,
+                'last_name' => $fcCustomer->last_name
+
+            ],
+            'transaction_amount' => MercadoPagoHelper::formatAmount($transaction->total, $transaction->currency),
+            'token' => Arr::get($mpFormData, 'token', ''),
+            'installments' => Arr::get($mpFormData, 'installments', 1),
+            'payment_method_id' => Arr::get($mpFormData, 'payment_method_id', ''),
         ];
 
 
@@ -48,6 +66,10 @@ class MercadoPagoProcessor
             'transaction' => $transaction
         ]);
 
+
+        $result = MercadoPagoAPI::createMercadoPagoObject('payments', $paymentData);
+
+        if (is_wp_error($paymentData)) {
 
         return [
             'status'       => 'success',

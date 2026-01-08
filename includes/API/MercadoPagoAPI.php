@@ -45,7 +45,7 @@ class MercadoPagoAPI
         $args = [
             'method'  => strtoupper($method),
             'headers' => [
-                'Authorization' => 'Bearer ' . sanitize_text_field($accessToken),
+                'Authorization' => 'Bearer ' . $accessToken,
                 'Content-Type'  => 'application/json',
                 'User-Agent'    => 'MercadoPagoFluentCart/1.0.0 WordPress/' . get_bloginfo('version'),
                 'X-Idempotency-Key' => wp_generate_uuid4(), // For payment safety
