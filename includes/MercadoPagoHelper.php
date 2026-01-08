@@ -86,7 +86,7 @@ class MercadoPagoHelper
             return (float) round($amount);
         }
 
-        return (float) number_format($amount, 2, '.', '');
+        return (float) number_format($amount / 100, 2, '.', '');
     }
 
  

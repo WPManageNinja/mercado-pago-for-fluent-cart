@@ -145,25 +145,13 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             $paymentDetails['mode'] = 'subscription';
         }
 
-        $availablePaymentMethods = MercadoPagoAPI::getMercadoPagoObject('v1/payment_methods');
+
+        $preference = $this->createPreference($items, $shippingCharge, Arr::get($tax, 'tax_total', 0));
 
 
-       // create preference
-       $preference = MercadoPagoAPI::createMercadoPagoObject('/checkout/preferences', [
-        'items' => [
-            [
-                'title' => 'Test Item',
-                'quantity' => 1,
-                'unit_price' => 100,
-            ]
-        ]
-       ]);
-
-
-
-      if (!is_wp_error($preference)) {
-        $paymentArgs['preference_id'] = Arr::get($preference, 'id', '');
-      }
+        if (!is_wp_error($preference)) {
+            $paymentArgs['preference_id'] = Arr::get($preference, 'id', '');
+        }
 
         wp_send_json([
             'status' => 'success',
@@ -171,6 +159,39 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'payment_args' => $paymentArgs,
             'intent' => $paymentDetails,
         ], 200);
+    }
+
+    public function createPreference($cartItems, $shippingCharge = 0, $tax = 0)
+    {
+        $items = [];
+        foreach ($cartItems as $item) {
+            $items[] = [
+                'title' => Arr::get($item, 'post_title', ''),
+                'quantity' => Arr::get($item, 'quantity', 1),
+                'unit_price' => MercadoPagoHelper::formatAmount(Arr::get($item, 'line_total', 0), CurrencySettings::get('currency')),
+            ];
+        }
+
+        if ($shippingCharge > 0) {
+            $items[] = [
+                'title' => __('Shipping Charge', 'mercado-pago-for-fluent-cart'),
+                'quantity' => 1,
+                'unit_price' => MercadoPagoHelper::formatAmount($shippingCharge, CurrencySettings::get('currency')),
+            ];
+        }
+
+        if ($tax > 0) {
+            $items[] = [
+                'title' => __('Tax', 'mercado-pago-for-fluent-cart'),
+                'quantity' => 1,
+                'unit_price' => MercadoPagoHelper::formatAmount($tax, CurrencySettings::get('currency')),
+            ];
+        }
+
+
+        return MercadoPagoAPI::createMercadoPagoObject('/checkout/preferences', [
+            'items' => $items,
+        ]);
     }
 
 

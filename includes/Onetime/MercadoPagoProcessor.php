@@ -70,6 +70,9 @@ class MercadoPagoProcessor
         $result = MercadoPagoAPI::createMercadoPagoObject('payments', $paymentData);
 
         if (is_wp_error($paymentData)) {
+            return $paymentData;
+        }
+
 
         return [
             'status'       => 'success',
