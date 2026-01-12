@@ -7,6 +7,7 @@ use MercadoPagoFluentCart\API\MercadoPagoAPI;
 use MercadoPagoFluentCart\MercadoPagoHelper;
 use FluentCart\App\App;
 use FluentCart\App\Helpers\Helper;
+use FluentCart\App\Helpers\Status;
 use FluentCart\App\Helpers\AddressHelper;
 use FluentCart\Framework\Support\Arr;
 
@@ -40,25 +41,28 @@ class MercadoPagoProcessor
         $payerInfo = MercadoPagoHelper::formatPayerInfo($fcCustomer, $order->billing_address);
 
         $paymentData = [
-            'x-idempotency-key' => $transaction->uuid,
-            'additional_info' => [
-                'ip-address' => $ipAddress,
-                'payer' => [
-                    'first_name' => $fcCustomer->first_name,
-                    'last_name' => $fcCustomer->last_name,
-                ]
-            ],
+            'transaction_amount' => Arr::get($mpFormData, 'transaction_amount', 0),
+            'token' => Arr::get($mpFormData, 'token', ''),
+            'description' => __('Fct Order #', 'mercado-pago-for-fluent-cart') . $order->uuid,
+            'installments' => Arr::get($mpFormData, 'installments', 1),
+            'payment_method_id' => Arr::get($mpFormData, 'payment_method_id', ''),
+            'issuer_id' => Arr::get($mpFormData, 'issuer_id', ''),
             'payer' => [
                 'email' => $fcCustomer->email,
                 'first_name' => $fcCustomer->first_name,
                 'last_name' => $fcCustomer->last_name
-
             ],
-            'transaction_amount' => MercadoPagoHelper::formatAmount($transaction->total, $transaction->currency),
-            'token' => Arr::get($mpFormData, 'token', ''),
-            'installments' => Arr::get($mpFormData, 'installments', 1),
-            'payment_method_id' => Arr::get($mpFormData, 'payment_method_id', ''),
+            'external_reference' => $transaction->uuid,
+            'metadata' => [
+                'order_hash' => $order->uuid,
+                'transaction_hash' => $transaction->uuid,
+            ],
+            // 'notification_url' => $this->getWebhookUrl(),
         ];
+
+        if (Arr::get($mpFormData, 'payer.identification')) {
+            $paymentData['payer']['identification'] = Arr::get($mpFormData, 'payer.identification', []);
+        }
 
 
         $paymentData = apply_filters('fluent_cart/mercadopago/onetime_payment_args', $paymentData, [
@@ -67,11 +71,44 @@ class MercadoPagoProcessor
         ]);
 
 
-        $result = MercadoPagoAPI::createMercadoPagoObject('payments', $paymentData);
+        $result = MercadoPagoAPI::createMercadoPagoObject('v1/payments', $paymentData);
 
-        if (is_wp_error($paymentData)) {
-            return $paymentData;
+
+        if (is_wp_error($result)) {
+            
+            return [
+                'status' => 'failed',
+                'message' => $result->get_error_message(),
+                'data' => [
+                    'payment_data' => $paymentData,
+                    'intent' => 'onetime',
+                    'transaction_hash' => $transaction->uuid,
+                    'amount' => $amount,
+                    'currency' => $transaction->currency,
+                ]
+            ];
         }
+
+        if (!in_array(Arr::get($result, 'status'), ['approved', 'authorized'])) {
+            
+            return [
+                'status' => 'failed',
+                'message' => __('Payment failed', 'mercado-pago-for-fluent-cart'),
+                'data' => [
+                    'payment_data' => $paymentData,
+                    'intent' => 'onetime',
+                    'transaction_hash' => $transaction->uuid,
+                    'amount' => $amount,
+                    'currency' => $transaction->currency,
+                ]
+            ];
+        }
+
+
+        // update transaction status  + vendor charge id
+        $transaction->update([
+            'vendor_charge_id' => Arr::get($result, 'id', ''),
+        ]);
 
 
         return [
@@ -80,11 +117,12 @@ class MercadoPagoProcessor
             'actionName'   => 'custom',
             'message'      => __('Please complete your payment', 'mercado-pago-for-fluent-cart'),
             'data'         => [
-                'payment_data'     => $paymentData,
-                'intent'           => 'onetime',
-                'transaction_hash' => $transaction->uuid,
-                'amount'           => $amount,
-                'currency'         => $transaction->currency,
+                'payment' => $result,
+                'order_data' => [
+                    'order_hash' => $order->uuid,
+                    'transaction_hash' => $transaction->uuid,
+                ],
+                'mode' => 'onetime',
             ]
         ];
     }

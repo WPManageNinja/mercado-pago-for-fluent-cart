@@ -150,5 +150,27 @@ class MercadoPagoHelper
 
        return $payerInfo;
     }
+
+    public static function determineLocale($currency = '')
+    {
+
+        if (!empty($currency)) {
+            $currency = strtoupper($currency);
+        }
+
+        $localesMap = [
+            'BRL' => 'pt-BR',
+            'ARS' => 'es-AR',
+            'CLP' => 'es-CL',
+            'MXN' => 'es-MX',
+            'COP' => 'es-CO',
+            'PEN' => 'es-PE',
+            'UYU' => 'es-UY',
+            'USD' => 'en-US',
+        ];
+
+        return $localesMap[$currency] ?? determine_locale();
+
+    }
 }
 

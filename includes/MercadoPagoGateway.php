@@ -132,7 +132,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         $hasSubscription = $this->validateSubscriptions($items);
 
         $paymentArgs['public_key'] = $publicKey;
-        $paymentArgs['locale'] = determine_locale();
+        $paymentArgs['locale'] = MercadoPagoHelper::determineLocale(CurrencySettings::get('currency'));
 
         $paymentDetails = [
             'mode' => 'payment',
@@ -153,6 +153,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             $paymentArgs['preference_id'] = Arr::get($preference, 'id', '');
         }
 
+
         wp_send_json([
             'status' => 'success',
             'message' => __('Order info retrieved!', 'mercado-pago-for-fluent-cart'),
@@ -168,7 +169,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             $items[] = [
                 'title' => Arr::get($item, 'post_title', ''),
                 'quantity' => Arr::get($item, 'quantity', 1),
-                'unit_price' => MercadoPagoHelper::formatAmount(Arr::get($item, 'line_total', 0), CurrencySettings::get('currency')),
+                'unit_price' => MercadoPagoHelper::formatAmount(Arr::get($item, 'line_total', 0) / Arr::get($item, 'quantity', 1), CurrencySettings::get('currency')),
             ];
         }
 
@@ -187,7 +188,6 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                 'unit_price' => MercadoPagoHelper::formatAmount($tax, CurrencySettings::get('currency')),
             ];
         }
-
 
         return MercadoPagoAPI::createMercadoPagoObject('/checkout/preferences', [
             'items' => $items,
