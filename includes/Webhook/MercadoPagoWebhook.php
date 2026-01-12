@@ -443,7 +443,7 @@ class MercadoPagoWebhook
         // Process each refund (Mercado Pago can have multiple refunds for one payment)
         foreach ($refunds as $refund) {
             $refundId = Arr::get($refund, 'id');
-            $refundAmount = Arr::get($refund, 'amount');
+            $refundAmount = Arr::get($refund, 'amount'); // This is in decimal format from MercadoPago
             $refundStatus = Arr::get($refund, 'status');
             
             // Only process approved refunds
@@ -451,24 +451,33 @@ class MercadoPagoWebhook
                 continue;
             }
             
+            // Convert decimal amount to cents (FluentCart stores amounts in cents)
+            // MercadoPago sends amounts in decimal format (e.g., 10.50)
+            // FluentCart stores in cents (e.g., 1050)
+            $refundAmountInCents = \FluentCart\App\Helpers\Helper::toCent($refundAmount);
+            
             // Prepare refund data matching Paystack pattern
             $refundData = [
                 'order_id'           => $order->id,
+                'order_type'         => $parentTransaction->order_type,
                 'transaction_type'   => Status::TRANSACTION_TYPE_REFUND,
                 'status'             => Status::TRANSACTION_REFUNDED,
                 'payment_method'     => 'mercado_pago',
+                'payment_method_type' => $parentTransaction->payment_method_type,
                 'payment_mode'       => $parentTransaction->payment_mode,
                 'vendor_charge_id'   => $refundId,
-                'total'              => $refundAmount,
+                'total'              => $refundAmountInCents,
                 'currency'           => $parentTransaction->currency,
+                'subscription_id'    => $parentTransaction->subscription_id,
                 'meta'               => [
                     'parent_id'          => $parentTransaction->id,
                     'refund_description' => Arr::get($refund, 'metadata.reason', ''),
-                    'refund_source'      => 'webhook'
+                    'refund_source'      => 'webhook',
+                    'mercadopago_refund_id' => $refundId
                 ]
             ];
             
-            $syncedRefund = (new MercadoPagoRefund())->createOrUpdateIpnRefund($refundData, $parentTransaction);
+            $syncedRefund = MercadoPagoRefund::createOrUpdateIpnRefund($refundData, $parentTransaction);
             
             if ($syncedRefund && $syncedRefund->wasRecentlyCreated) {
                 $currentCreatedRefund = $syncedRefund;

@@ -288,7 +288,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             );
         }
 
-        return (new MercadoPagoRefund())->processRemoteRefund($transaction, $amount, $args);
+        return MercadoPagoRefund::processRemoteRefund($transaction, $amount, $args);
 
     }
 

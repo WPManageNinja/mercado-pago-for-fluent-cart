@@ -6,7 +6,9 @@ use FluentCart\App\Helpers\Status;
 use FluentCart\App\Models\OrderTransaction;
 use FluentCart\App\Services\Payments\PaymentHelper;
 use FluentCart\Framework\Support\Arr;
+use FluentCart\Api\CurrencySettings;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
+use MercadoPagoFluentCart\MercadoPagoHelper;
 
 
 if (!defined('ABSPATH')) {
@@ -27,24 +29,77 @@ class MercadoPagoRefund
             );
         }
 
-        $refundData = [
-            'amount' => $amount,
-        ];
 
-        // Add metadata if available
-        if (!empty($args['note'])) {
-            $refundData['metadata'] = [
-                'reason' => $args['note']
-            ];
+        if ($amount <= 0) {
+            return new \WP_Error(
+                'mercadopago_refund_error',
+                __('Refund amount must be greater than zero', 'mercado-pago-for-fluent-cart')
+            );
         }
 
-        // Create refund via Mercado Pago API
+        $payment = MercadoPagoAPI::getMercadoPagoObject('v1/payments/' . $mercadoPagoPaymentId);
+        
+        if (is_wp_error($payment)) {
+            return new \WP_Error(
+                'mercadopago_refund_error',
+                __('Failed to fetch payment details: ', 'mercado-pago-for-fluent-cart') . $payment->get_error_message()
+            );
+        }
+
+        $paymentStatus = Arr::get($payment, 'status');
+
+        if ($paymentStatus !== 'approved') {
+            return new \WP_Error(
+                'mercadopago_refund_error',
+                sprintf(
+                    __('Payment must be approved to process refund. Current status: %s', 'mercado-pago-for-fluent-cart'),
+                    $paymentStatus
+                )
+            );
+        }
+
+        $currency = $transaction->currency ?: CurrencySettings::get('currency');
+        $formattedAmount = MercadoPagoHelper::formatAmount($amount, $currency);
+
+        $totalPaid = (float) Arr::get($payment, 'transaction_amount', 0);
+        $totalRefunded = (float) Arr::get($payment, 'transaction_details.total_refunded', 0);
+        $availableRefund = $totalPaid - $totalRefunded;
+
+        // Validate refund amount doesn't exceed available
+        if ($formattedAmount > $availableRefund) {
+            return new \WP_Error(
+                'mercadopago_refund_error',
+                sprintf(
+                    __('Refund amount (%.2f) exceeds available refund amount (%.2f)', 'mercado-pago-for-fluent-cart'),
+                    $formattedAmount,
+                    $availableRefund
+                )
+            );
+        }
+
+        $refundData = [
+            'amount' => $formattedAmount,
+        ];
+
+
         $refund = MercadoPagoAPI::createMercadoPagoObject(
             'v1/payments/' . $mercadoPagoPaymentId . '/refunds',
             $refundData
         );
 
         if (is_wp_error($refund)) {
+            $errorMessage = $refund->get_error_message();
+            fluent_cart_add_log(
+                'MercadoPago Refund Error',
+                'ERROR processing refund on Mercado_pago: ' . $errorMessage,
+                'error',
+                [
+                    'log_type' => 'payment',
+                    'payment_id' => $mercadoPagoPaymentId,
+                    'amount' => $formattedAmount,
+                    'currency' => $currency
+                ]
+            );
             return $refund;
         }
 
@@ -58,15 +113,30 @@ class MercadoPagoRefund
             );
         }
 
-        // Mercado Pago refund statuses: approved, pending, rejected
-        $acceptedStatus = ['approved', 'pending'];
+        $acceptedStatus = ['approved', 'in_process', 'authorized'];
 
         if (!in_array($refundStatus, $acceptedStatus)) {
             return new \WP_Error(
                 'refund_failed', 
-                __('Refund was rejected. Please check your Mercado Pago account', 'mercado-pago-for-fluent-cart')
+                sprintf(
+                    __('Refund was rejected with status: %s. Please check your Mercado Pago account', 'mercado-pago-for-fluent-cart'),
+                    $refundStatus
+                )
             );
         }
+
+        fluent_cart_add_log(
+            'MercadoPago Refund Success',
+            'Refund processed successfully. Refund ID: ' . $refundId,
+            'info',
+            [
+                'log_type' => 'payment',
+                'payment_id' => $mercadoPagoPaymentId,
+                'refund_id' => $refundId,
+                'amount' => $formattedAmount,
+                'status' => $refundStatus
+            ]
+        );
 
         return $refundId;
     }
