@@ -81,6 +81,21 @@ class MercadoPagoSettingsBase extends BaseGatewaySettings
         return Helper::decryptKey($accessToken);
     }
 
+    public function getWebhookSecretKey($mode = 'current')
+    {
+        if ($mode == 'current' || !$mode) {
+            $mode = $this->getMode();
+        }
+
+        if ($mode === 'test') {
+            $webhookSecretKey = $this->get('test_webhook_secret_key');
+        } else {
+            $webhookSecretKey = $this->get('live_webhook_secret_key');
+        }
+
+        return $webhookSecretKey;
+    }
+
     public function getPublicKey($mode = 'current')
     {
         if ($mode == 'current' || !$mode) {

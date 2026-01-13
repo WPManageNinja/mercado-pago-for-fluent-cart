@@ -22,10 +22,10 @@ class MercadoPagoWebhook
     public function init()
     {
         // Payment webhooks (type: payment) - for one-time payment confirmation
-        add_action('fluent_cart/payments/mercado_pago/webhook_payment', [$this, 'handlePaymentUpdate'], 10, 1);
+        add_action('fluent_cart/payments/mercado_pago/webhook_payment_approved', [$this, 'handlePaymentApproved'], 10, 1);
         
         // Orders webhooks (type: orders) - for one-time payment confirmation (Checkout Transparente, Point, QR Code)
-        add_action('fluent_cart/payments/mercado_pago/webhook_orders', [$this, 'handlePaymentUpdate'], 10, 1);
+        add_action('fluent_cart/payments/mercado_pago/webhook_orders_approved   ', [$this, 'handleOrdersApproved'], 10, 1);
         
         // Subscription webhooks
         add_action('fluent_cart/payments/mercado_pago/webhook_subscription_preapproval', [$this, 'handleSubscriptionUpdate'], 10, 1); // Create/cancel subscription
@@ -50,30 +50,23 @@ class MercadoPagoWebhook
             exit('Invalid JSON payload');
         }
 
-        // Verify webhook signature (x-signature header)
+
         if (!$this->verifySignature($data)) {
             http_response_code(401);
             exit('Invalid signature / Verification failed');
         }
 
         // Mercado Pago sends notification type and ID
-        $type = Arr::get($data, 'type');
+        $action = Arr::get($data, 'action');
         $resourceId = Arr::get($data, 'data.id');
 
-        if (!$type || !$resourceId) {
+        if (!$action || !$resourceId) {
             http_response_code(400);
             exit('Missing required webhook data');
         }
 
-        // Fetch the actual resource from Mercado Pago
-        $resource = $this->fetchResource($type, $resourceId);
-        
-        if (is_wp_error($resource)) {
-            http_response_code(500);
-            exit('Failed to fetch resource');
-        }
 
-        $order = $this->getFluentCartOrder($resource, $type);
+        $order = $this->getFluentCartOrder($data, $action);
 
         if (!$order) {
             http_response_code(404);
@@ -81,11 +74,11 @@ class MercadoPagoWebhook
         }
 
         // Convert type to event name
-        $event = str_replace('.', '_', $type);
+        $event = str_replace('.', '_', $action);
 
         if (has_action('fluent_cart/payments/mercado_pago/webhook_' . $event)) {
             do_action('fluent_cart/payments/mercado_pago/webhook_' . $event, [
-                'payload' => $resource,
+                'payload' => $data,
                 'order'   => $order
             ]);
 
@@ -117,123 +110,36 @@ class MercadoPagoWebhook
      * Verify webhook signature according to Mercado Pago documentation
      * https://www.mercadopago.com.br/developers/en/docs/your-integrations/notifications/webhooks
      */
-    private function verifySignature($data)
+    private function verifySignature($payload)
     {
-        // Get x-signature and x-request-id headers
-        $xSignature = isset($_SERVER['HTTP_X_SIGNATURE']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_SIGNATURE'])) : '';
-        $xRequestId = isset($_SERVER['HTTP_X_REQUEST_ID']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_REQUEST_ID'])) : '';
-
-        if (empty($xSignature)) {
-            fluent_cart_add_log('Mercado Pago Webhook Verification', 'Missing x-signature header', 'warning', ['log_type' => 'webhook']);
+        $headerSignature = isset($_SERVER['HTTP_X_SIGNATURE']) ? $_SERVER['HTTP_X_SIGNATURE'] : '';
+        if (!$headerSignature) {
             return false;
         }
 
-        // Extract data.id from query params (it comes as a query parameter in the webhook URL)
-        $dataId = isset($_GET['data.id']) ? sanitize_text_field(wp_unslash($_GET['data.id'])) : Arr::get($data, 'data.id', '');
-        
-        // If data.id is alphanumeric, convert to lowercase as per Mercado Pago docs
-        if (!empty($dataId) && ctype_alnum($dataId)) {
-            $dataId = strtolower($dataId);
-        }
-
-        // Parse x-signature to extract ts and v1
-        $parts = explode(',', $xSignature);
-        $ts = null;
-        $hash = null;
-
-        foreach ($parts as $part) {
-            $keyValue = explode('=', $part, 2);
-            if (count($keyValue) == 2) {
-                $key = trim($keyValue[0]);
-                $value = trim($keyValue[1]);
-                
-                if ($key === 'ts') {
-                    $ts = $value;
-                } elseif ($key === 'v1') {
-                    $hash = $value;
-                }
+        // Parse signature, expecting format: ts=TIMESTAMP,v1=SIGNATURE
+        $signatureParts = [];
+        foreach (explode(',', $headerSignature) as $part) {
+            $pair = explode('=', trim($part), 2);
+            if (count($pair) == 2) {
+                $signatureParts[$pair[0]] = $pair[1];
             }
         }
+        if (empty($signatureParts['ts']) || empty($signatureParts['v1'])) {
+            return false;
+        }
+        $signatureTimestamp = $signatureParts['ts'];
+        $signatureHash      = $signatureParts['v1'];
 
-        if (empty($ts) || empty($hash)) {
-            fluent_cart_add_log('Mercado Pago Webhook Verification', 'Invalid x-signature format', 'warning', ['log_type' => 'webhook']);
+        $secretKey = (new MercadoPagoSettingsBase())->getWebhookSecretKey('current');
+        if (!$secretKey) {
             return false;
         }
 
-        // Get secret key from settings
-        $secret = $this->getSecretKey();
-        
-        if (empty($secret)) {
-            fluent_cart_add_log('Mercado Pago Webhook Verification', 'Secret key not configured', 'error', ['log_type' => 'webhook']);
-            return false;
-        }
+        $computedSignature = hash_hmac('sha512', $payload, $secretKey);
 
-        // Build manifest string according to Mercado Pago template
-        // Template: id:[data.id_url];request-id:[x-request-id_header];ts:[ts_header];
-        $manifestParts = [];
-        
-        if (!empty($dataId)) {
-            $manifestParts[] = "id:{$dataId}";
-        }
-        
-        if (!empty($xRequestId)) {
-            $manifestParts[] = "request-id:{$xRequestId}";
-        }
-        
-        if (!empty($ts)) {
-            $manifestParts[] = "ts:{$ts}";
-        }
-        
-        $manifest = implode(';', $manifestParts) . ';';
-
-        // Calculate HMAC-SHA256
-        $calculatedHash = hash_hmac('sha256', $manifest, $secret);
-
-        // Compare hashes
-        if (hash_equals($calculatedHash, $hash)) {
-            fluent_cart_add_log('Mercado Pago Webhook Verification', 'Signature verified successfully', 'info', ['log_type' => 'webhook']);
-            return true;
-        }
-
-        fluent_cart_add_log('Mercado Pago Webhook Verification', 'Signature verification failed', 'warning', [
-            'log_type' => 'webhook',
-            'manifest' => $manifest,
-            'expected_hash' => $hash,
-            'calculated_hash' => $calculatedHash
-        ]);
-
-        return false;
+        return hash_equals($signatureHash, $computedSignature);
     }
-
-    /**
-     * Get secret key for webhook signature verification
-     */
-    private function getSecretKey()
-    {
-        $settings = new MercadoPagoSettingsBase();
-        $paymentMode = $settings->get('payment_mode');
-        
-        if (empty($paymentMode)) {
-            $paymentMode = 'test';
-        }
-        
-        // Get the encrypted secret from settings
-        $encryptedSecret = $settings->get($paymentMode . '_webhook_secret');
-        
-        if (empty($encryptedSecret)) {
-            return '';
-        }
-        
-        // Decrypt the secret key
-        try {
-            $secretKey = \FluentCart\App\Helpers\Helper::decryptKey($encryptedSecret);
-            return $secretKey;
-        } catch (\Exception $e) {
-            fluent_cart_add_log('Mercado Pago Webhook', 'Failed to decrypt webhook secret: ' . $e->getMessage(), 'error', ['log_type' => 'webhook']);
-            return '';
-        }
-    }
-
     
     private function fetchResource($type, $resourceId)
     {
@@ -267,7 +173,7 @@ class MercadoPagoWebhook
     }
 
 
-    public function handlePaymentUpdate($data)
+    public function handlePaymentApproved($data)
     {
        $mercadoPagoPayment = Arr::get($data, 'payload');
        $mercadoPagoPaymentId = Arr::get($mercadoPagoPayment, 'id');
@@ -496,9 +402,23 @@ class MercadoPagoWebhook
         $this->sendResponse(200, 'Refund processed successfully');
     }
 
-    public function getFluentCartOrder($resource, $type)
+    public function getFluentCartOrder($data, $action)
     {
         $order = null;
+        $type = explode('.', $action)[0];
+        $id = Arr::get($data, 'data.id');
+
+        if ($type == 'payment') {
+            $resource =  MercadoPagoAPI::getMercadoPagoObject('v1/payments/' . $id);
+        } else if ($type == 'orders') {
+            $resource =  MercadoPagoAPI::getMercadoPagoObject('v1/orders/' . $id);
+        } else if ($type == 'subscription.preapproval') {
+            $resource =  MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $id);
+        } else if ($type == 'subscription.authorized_payment') {
+            $resource =  MercadoPagoAPI::getMercadoPagoObject('authorized_payments/' . $id);
+        } else {
+            return null;
+        }
 
         // Try to get external reference from payment or orders (one-time payments)
         if (in_array($type, ['payment', 'orders'])) {
