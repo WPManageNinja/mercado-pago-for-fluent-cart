@@ -33,3 +33,9 @@
 .fluent-cart-checkout_embed_payment_container .mp-checkout-bricks__payment-form label {
     padding: 0px;
 }
+
+/* status screen brick */
+
+.fluent-cart-checkout_embed_payment_container #statusScreenBrick_container {
+    border: 0;
+}

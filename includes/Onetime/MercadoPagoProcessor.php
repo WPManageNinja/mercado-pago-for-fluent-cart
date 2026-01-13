@@ -16,13 +16,8 @@ class MercadoPagoProcessor
     public function handleSinglePayment(PaymentInstance $paymentInstance, $paymentArgs = [])
     {
         $mpFormData = Arr::get(App::request()->all(), 'mp_form_data', '');
-        if (empty($mpFormData)) {
-            return new \WP_Error(
-                'mercado_pago_form_data_missing',
-                __('Mercado Pago form data is missing', 'mercado-pago-for-fluent-cart'),
-                ['response' => $mpFormData]
-            );
-        }
+        $mpSelectedPaymentMethod = sanitize_text_field(Arr::get(App::request()->all(), 'mp_selected_payment_method', ''));
+
 
         $mpFormData = json_decode($mpFormData, true);
 
@@ -50,18 +45,23 @@ class MercadoPagoProcessor
             'payer' => [
                 'email' => $fcCustomer->email,
                 'first_name' => $fcCustomer->first_name,
-                'last_name' => $fcCustomer->last_name
+                'last_name' => $fcCustomer->last_name,
             ],
             'external_reference' => $transaction->uuid,
             'metadata' => [
                 'order_hash' => $order->uuid,
                 'transaction_hash' => $transaction->uuid,
             ],
-            // 'notification_url' => $this->getWebhookUrl(),
+            'notification_url' => $this->getWebhookUrl(),
         ];
 
         if (Arr::get($mpFormData, 'payer.identification')) {
-            $paymentData['payer']['identification'] = Arr::get($mpFormData, 'payer.identification', []);
+            $paymentData['payer']['identification']['type'] = Arr::get($mpFormData, 'payer.identification_type', '');
+            $paymentData['payer']['identification']['number'] = Arr::get($mpFormData, 'payer.identification.number', []);
+        }
+
+        if (Arr::get($payerInfo, 'address')) {
+            $paymentData['payer']['address'] = Arr::get($payerInfo, 'address', []);
         }
 
 
@@ -70,12 +70,15 @@ class MercadoPagoProcessor
             'transaction' => $transaction
         ]);
 
+        // unset every empty value from $paymentData
+        $paymentData = array_filter($paymentData, function($value) {
+            return !empty($value);
+        });
+
 
         $result = MercadoPagoAPI::createMercadoPagoObject('v1/payments', $paymentData);
 
-
         if (is_wp_error($result)) {
-            
             return [
                 'status' => 'failed',
                 'message' => $result->get_error_message(),
@@ -89,7 +92,8 @@ class MercadoPagoProcessor
             ];
         }
 
-        if (!in_array(Arr::get($result, 'status'), ['approved', 'authorized'])) {
+
+        if (!in_array(Arr::get($result, 'status'), ['approved', 'authorized', 'pending'])) {
             
             return [
                 'status' => 'failed',
@@ -103,7 +107,6 @@ class MercadoPagoProcessor
                 ]
             ];
         }
-
 
         // update transaction status  + vendor charge id
         $transaction->update([
@@ -123,12 +126,14 @@ class MercadoPagoProcessor
                     'transaction_hash' => $transaction->uuid,
                 ],
                 'mode' => 'onetime',
+                'receipt_page_url' => $transaction->getReceiptPageUrl(),
             ]
         ];
     }
 
     public function getWebhookUrl()
     {
+        return 'https://webhook.fluentmonitor.com/webhook/sDB6ZTRm4vbs0VTPEMg3WAIO5lCNRzi4';
         return site_url('?fluent-cart=fct_payment_listener_ipn&method=mercado_pago');
     }
 }

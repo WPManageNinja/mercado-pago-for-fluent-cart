@@ -56,6 +56,8 @@ class MercadoPagoAPI
 
         if (in_array($method, ['POST', 'PUT']) && !empty($data)) {
             $args['body'] = wp_json_encode($data);
+        } elseif (in_array($method, ['GET', 'DELETE']) && !empty($data)) {
+            $url = add_query_arg($data, $url);
         }
 
         $response = wp_remote_request($url, $args);

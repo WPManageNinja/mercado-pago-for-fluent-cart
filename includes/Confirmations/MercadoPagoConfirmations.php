@@ -20,21 +20,6 @@ class MercadoPagoConfirmations
 {
     public function init()
     {
-        // Register REST API routes for Payment Brick (to process payments from frontend)
-        add_action('rest_api_init', function () {
-            register_rest_route('mercadopago', '/process_payment', [
-                'methods'             => 'POST',
-                'callback'            => [$this, 'processPaymentViaAPI'],
-                'permission_callback' => '__return_true',
-            ]);
-
-            register_rest_route('mercadopago', '/create_subscription', [
-                'methods'             => 'POST',
-                'callback'            => [$this, 'createSubscriptionViaAPI'],
-                'permission_callback' => '__return_true',
-            ]);
-        });
-
         // Register AJAX handlers for payment confirmation (after payment is processed)
         add_action('wp_ajax_nopriv_fluent_cart_confirm_mercadopago_payment_onetime', [$this, 'confirmMercadoPagoSinglePayment']);
         add_action('wp_ajax_fluent_cart_confirm_mercadopago_payment_onetime', [$this, 'confirmMercadoPagoSinglePayment']);
@@ -266,9 +251,16 @@ class MercadoPagoConfirmations
             );
         }
 
+        if ($paymentStatus === 'pending') {
+            wp_send_json([
+                'status'  => 'pending',
+                'message' => __('Payment not approved/authorized yet', 'mercado-pago-for-fluent-cart')
+            ], 200);
+        }
+
         wp_send_json([
             'status'  => 'failed',
-            'message' => __('Payment not approved yet', 'mercado-pago-for-fluent-cart')
+            'message' => __('Payment confirmation failed', 'mercado-pago-for-fluent-cart')
         ], 422);
     }
 

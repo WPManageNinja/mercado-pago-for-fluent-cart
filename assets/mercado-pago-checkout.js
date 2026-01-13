@@ -11,6 +11,8 @@ class MercadoPagoCheckout {
         this.mp = null;
         this.bricksBuilder = null;
         this.paymentBrickController = null;
+        this.statusScreenBrickController = null;
+        this.mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
     }
 
     translate(string) {
@@ -19,10 +21,14 @@ class MercadoPagoCheckout {
     }
 
     async init() {
-        const ref = this;
-        let mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
+        // if already initialized, unmount it
+        if (this.paymentBrickController) {
+            this.paymentBrickController.unmount();
+        }
 
-        if (!mercadoPagoContainer) {
+        const ref = this;
+
+        if (!this.mercadoPagoContainer) {
             return;
         }
 
@@ -39,7 +45,7 @@ class MercadoPagoCheckout {
 
         let orderData = null;
 
-        this.paymentHandler(ref, orderData, mercadoPagoContainer, this.intentMode);
+        this.paymentHandler(ref, orderData, this.intentMode);
     }
 
     async loadMercadoPagoSDK() {
@@ -57,7 +63,7 @@ class MercadoPagoCheckout {
         });
     }
 
-    async paymentHandler(ref, orderData, mercadoPagoContainer, intentMode) {
+    async paymentHandler(ref, orderData, intentMode) {
         const that = this;
         const params = new URLSearchParams(window.location.search);
         const mode = params.get('mode') || 'order';
@@ -71,7 +77,7 @@ class MercadoPagoCheckout {
         // Create container for Payment Brick
         const brickContainer = document.createElement('div');
         brickContainer.id = 'paymentBrick_container';
-        mercadoPagoContainer.appendChild(brickContainer);
+        this.mercadoPagoContainer.appendChild(brickContainer);
 
         const settings = {
             initialization: {
@@ -105,14 +111,14 @@ class MercadoPagoCheckout {
                         loadingElement.remove();
                     }
                 },
-                onSubmit: async ({ selectedPaymentMethod, formData }) => {
+                onSubmit: async ({ selectedPaymentMethod, formData }) => {                    
                     that.paymentLoader?.changeLoaderStatus('processing');
 
                     return new Promise(async (resolve, reject) => {
                         try {
                             // Append Mercado Pago formData to the main FluentCart form
                             // This makes it available in the backend via orderHandler
-                            that.appendMercadoPagoFormDataToMainForm(formData);
+                            that.appendMercadoPagoFormDataToMainForm(formData, selectedPaymentMethod);
 
                             // First, create the order in FluentCart
                             if (typeof ref.orderHandler === 'function') {
@@ -133,45 +139,20 @@ class MercadoPagoCheckout {
                                 } else {
 
                                     if (response?.data?.payment?.status === 'approved' || response?.data?.payment?.status === 'authorized') {
-                                        const confirmParams = new URLSearchParams({
-                                            action: 'fluent_cart_confirm_mercadopago_payment_onetime',
-                                            payment_id: response.data?.payment?.id,
-                                            transaction_hash : orderData?.transaction_hash,
-                                            order_hash : orderData?.order_hash,
-                                        });
-                                        
-                                        const xhr = new XMLHttpRequest();
-                                        xhr.open('POST', window.fluentcart_checkout_vars.ajaxurl, true);
-                                        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-
-                                        xhr.onload = function () {
-                                            if (xhr.status >= 200 && xhr.status < 300) {
-                                                try {
-                                                    const res = JSON.parse(xhr.responseText);
-                                                    if (res?.redirect_url) {
-                                                        that.paymentLoader.triggerPaymentCompleteEvent(res);
-                                                        that.paymentLoader?.changeLoaderStatus('redirecting');
-                                                        window.location.href = res.redirect_url;
-                                                    }
-                                                } catch (error) {
-                                                    console.error('Error parsing response:', error);
-                                                    reject();
-                                                }
-                                            } else {
-                                                console.error('Network response was not ok');
-                                                reject();
-                                            }
-                                        };
-
-                                        xhr.onerror = function () {
-                                            reject();
+                                        try {
+                                            await that.confirmPayment(response?.data?.payment?.id, orderData?.transaction_hash, orderData?.order_hash);
+                                            that.cleanupMercadoPagoFormData();
+                                            resolve();
+                                        } catch (error) {
+                                            console.error('Payment confirmation failed:', error);
+                                            that.cleanupMercadoPagoFormData();
+                                            return reject(error);
                                         }
+                                    } else if (response?.data?.payment?.status === 'pending') {
+                                       this.renderStatusScreenBrick(response?.data?.payment?.id, orderData?.transaction_hash, orderData?.order_hash);
 
-                                        xhr.send(confirmParams.toString());
-                                        
-                                        that.cleanupMercadoPagoFormData();
-                                        resolve();
-                                    } else {
+                                    }
+                                    else {
                                         that.showError(that.$t('Payment not approved, Try again!'));
                                     }
                                 }
@@ -223,7 +204,157 @@ class MercadoPagoCheckout {
         }
     }
 
-    appendMercadoPagoFormDataToMainForm(formData) {
+    async confirmPayment(paymentId, transactionHash, orderHash) {
+        const that = this;
+        const confirmParams = new URLSearchParams({
+            action: 'fluent_cart_confirm_mercadopago_payment_onetime',
+            payment_id: paymentId,
+            transaction_hash : transactionHash,
+            order_hash : orderHash,
+        });
+        
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', window.fluentcart_checkout_vars.ajaxurl, true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+
+            xhr.onload = function () {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const res = JSON.parse(xhr.responseText);
+
+                        if (res?.status === 'failed') {
+                            that.showError(res?.message || that.$t('Payment confirmation failed'));
+                            that.paymentLoader?.hideLoader();
+                            that.paymentLoader?.enableCheckoutButton();
+                            return reject(new Error(res?.message));
+                        }
+                        
+                        if (res?.redirect_url) {
+                            that.paymentLoader?.changeLoaderStatus('redirecting');
+                            window.location.href = res.redirect_url;
+                            return resolve(true);
+                        } else {
+                            that.showError(res?.message || that.$t('Something went wrong'));
+                            that.paymentLoader?.hideLoader();
+                            that.paymentLoader?.enableCheckoutButton();
+                            return reject(new Error(res?.message || 'No redirect URL'));
+                        }
+                    } catch (error) {
+                        that.showError(that.$t('Something went wrong'));
+                        that.paymentLoader?.hideLoader();
+                        that.paymentLoader?.enableCheckoutButton();
+                        return reject(error);
+                    }
+                } else {
+                    console.log('xhr.status', xhr);
+                    that.showError( xhr.statusText || that.$t('Network response was not ok'));
+                    that.paymentLoader?.hideLoader();
+                    that.paymentLoader?.enableCheckoutButton();
+                    return reject(new Error('Network error'));
+                }
+            };
+
+            xhr.onerror = function (error) {
+                console.error('XHR error:', error);
+                that.showError(that.$t('Something went wrong'));
+                that.paymentLoader?.hideLoader();
+                that.paymentLoader?.enableCheckoutButton();
+                return reject(error);
+            };
+
+            xhr.send(confirmParams.toString());
+        });
+    }
+
+
+    async renderStatusScreenBrick(paymentId, transactionHash, orderHash) {
+
+        this.paymentBrickController.unmount();
+
+        const existingStatusScreenBrickContainer = document.getElementById('statusScreenBrick_container');
+        if (existingStatusScreenBrickContainer && existingStatusScreenBrickContainer.parentNode) {
+            existingStatusScreenBrickContainer.parentNode.removeChild(existingStatusScreenBrickContainer);
+        }
+
+        // create status screen brick container
+        const statusScreenBrickContainer = document.createElement('div');
+        statusScreenBrickContainer.id = 'statusScreenBrick_container';
+        this.mercadoPagoContainer.appendChild(statusScreenBrickContainer);
+
+        const settings = {
+          initialization: {
+            paymentId: paymentId, // payment id to show
+          },
+          callbacks: {
+            onReady: () => {
+               const loadingElement = document.getElementById('fct_loading_payment_processor');
+               if (loadingElement) {
+                loadingElement.remove();
+               }
+
+                this.paymentLoader?.hideLoader();
+
+                const donePaymentButton = document.createElement('button');
+                donePaymentButton.id = 'mp_fct_done_payment_button';
+                donePaymentButton.className = 'mp-payment-done-button';
+                donePaymentButton.textContent = this.$t('Confirm After Payment');
+                
+                // Apply inline styles to ensure they work
+                Object.assign(donePaymentButton.style, {
+                    display: 'block',
+                    maxWidth: '448px',
+                    width: '92%',
+                    margin: '10px auto',
+                    padding: '16px 24px',
+                    backgroundColor: '#009ee3',
+                    color: '#ffffff',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    textAlign: 'center',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    transition: 'all 0.2s ease'
+                });
+                
+                // Add hover effect
+                donePaymentButton.addEventListener('mouseenter', () => {
+                    donePaymentButton.style.backgroundColor = '#0086c3';
+                    donePaymentButton.style.transform = 'translateY(-1px)';
+                    donePaymentButton.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+                });
+                
+                donePaymentButton.addEventListener('mouseleave', () => {
+                    donePaymentButton.style.backgroundColor = '#009ee3';
+                    donePaymentButton.style.transform = 'translateY(0)';
+                    donePaymentButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                });
+                
+                donePaymentButton.addEventListener('click', () => {
+                    this.confirmPayment(paymentId, transactionHash, orderHash);
+                });
+                
+                statusScreenBrickContainer.appendChild(donePaymentButton);
+
+            },
+            onError: (error) => {
+              this.showError(this.$t('Something went wrong'));
+            },
+          },
+         };
+
+         window.statusScreenBrickController = await this.bricksBuilder.create(
+          'statusScreen',
+          'statusScreenBrick_container',
+          settings,
+         ); 
+
+    };
+
+
+    appendMercadoPagoFormDataToMainForm(formData, selectedPaymentMethod) {
         this.cleanupMercadoPagoFormData();
 
         if (!formData || typeof formData !== 'object') {
@@ -238,11 +369,19 @@ class MercadoPagoCheckout {
         this.form.appendChild(input);
 
         this.mercadoPagoFormField = input;
+
+        const input2 = document.createElement('input');
+        input2.type = 'hidden';
+        input2.name = 'mp_selected_payment_method';
+        input2.value = selectedPaymentMethod;
+        input2.className = 'fct-mercadopago-form-data';
+        this.form.appendChild(input2);
+
+        this.mercadoPagoSelectedPaymentMethodField = input2;
     }
 
 
     cleanupMercadoPagoFormData() {
-        // Remove the stored field reference
         if (this.mercadoPagoFormField && this.mercadoPagoFormField.parentNode) {
             this.mercadoPagoFormField.parentNode.removeChild(this.mercadoPagoFormField);
             this.mercadoPagoFormField = null;
@@ -269,18 +408,16 @@ class MercadoPagoCheckout {
         errorDiv.className = 'fct-error-message';
         errorDiv.textContent = message;
 
-        const mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
-        if (mercadoPagoContainer) {
-            const existingError = mercadoPagoContainer.querySelector('.fct-error-message');
+        if (this.mercadoPagoContainer) {
+            const existingError = this.mercadoPagoContainer.querySelector('.fct-error-message');
             if (existingError) {
                 existingError.remove();
             }
-            mercadoPagoContainer.appendChild(errorDiv);
+            this.mercadoPagoContainer.appendChild(errorDiv);
         }
     }
 
     unmount() {
-        // Unmount the payment brick controller if it exists
         if (this.paymentBrickController && typeof this.paymentBrickController.unmount === 'function') {
             try {
                 this.paymentBrickController.unmount();
@@ -290,7 +427,6 @@ class MercadoPagoCheckout {
             this.paymentBrickController = null;
         }
 
-        // Also cleanup global reference
         if (window.paymentBrickController && typeof window.paymentBrickController.unmount === 'function') {
             try {
                 window.paymentBrickController.unmount();
@@ -305,29 +441,20 @@ class MercadoPagoCheckout {
         if (brickContainer && brickContainer.parentNode) {
             brickContainer.parentNode.removeChild(brickContainer);
         }
-
-        // Cleanup form data
+        
         this.cleanupMercadoPagoFormData();
 
-        // Reset references
         this.mp = null;
         this.bricksBuilder = null;
     }
 }
 
-// Store global instance reference for cleanup
 window.mercadopagoCheckoutInstance = null;
 
-// Listen for FluentCart payment loading event
 window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
-    if (window.mercadopagoCheckoutInstance && typeof window.mercadopagoCheckoutInstance.unmount === 'function') {
-
-        // console.log('Unmounting MercadoPago checkout instance');
-
+    if (window.mercadopagoCheckoutInstance && typeof window.mercadopagoCheckoutInstance.unmount === 'function' && window.mercadopagoCheckoutInstance.mercadoPagoContainer) {
         window.mercadopagoCheckoutInstance.unmount();
         window.mercadopagoCheckoutInstance = null;
-
-        
     }
 
     window.dispatchEvent(new CustomEvent('fluent_cart_payment_method_loading', {
@@ -379,9 +506,8 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         errorDiv.className = 'fct-error-message';
         errorDiv.textContent = message;
 
-        const mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
-        if (mercadoPagoContainer) {
-            mercadoPagoContainer.appendChild(errorDiv);
+        if (this.mercadoPagoContainer) {
+            this.mercadoPagoContainer.appendChild(errorDiv);
         }
 
         const loadingElement = document.getElementById('fct_loading_payment_processor');
@@ -391,8 +517,7 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
     }
 
     function addLoadingText() {
-        let mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
-        if (!mercadoPagoContainer) return;
+        if (!this.mercadoPagoContainer) return;
 
         const loadingMessage = document.createElement('p');
         loadingMessage.id = 'fct_loading_payment_processor';

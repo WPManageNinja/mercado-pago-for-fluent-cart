@@ -80,8 +80,6 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         add_filter('fluent_cart/payment_methods/mercado_pago_settings', [$this, 'getSettings'], 10, 2);
 
         (new Confirmations\MercadoPagoConfirmations())->init();
-
-        // Add custom checkout button support
         add_filter('fluent_cart/payment_methods_with_custom_checkout_buttons', function ($methods) {
             $methods[] = 'mercado_pago';
             return $methods;
@@ -145,14 +143,13 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             $paymentDetails['mode'] = 'subscription';
         }
 
+        // wallet support is disabled for now
+        // $preference = $this->createPreference($items, $shippingCharge, Arr::get($tax, 'tax_total', 0));
 
-        $preference = $this->createPreference($items, $shippingCharge, Arr::get($tax, 'tax_total', 0));
 
-
-        if (!is_wp_error($preference)) {
-            $paymentArgs['preference_id'] = Arr::get($preference, 'id', '');
-        }
-
+        // if (!is_wp_error($preference)) {
+        //     $paymentArgs['preference_id'] = Arr::get($preference, 'id', '');
+        // }
 
         wp_send_json([
             'status' => 'success',
@@ -164,6 +161,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
     public function createPreference($cartItems, $shippingCharge = 0, $tax = 0)
     {
+        $cart = CartHelper::getCart();
         $items = [];
         foreach ($cartItems as $item) {
             $items[] = [
@@ -189,10 +187,22 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             ];
         }
 
+
+
         return MercadoPagoAPI::createMercadoPagoObject('/checkout/preferences', [
             'items' => $items,
+            // 'auto_return' => 'approved',
+            // 'back_urls' => [
+            //     'success' => $this->getSuccessUrl($paymentInstance->transaction),
+            //     'failure' => $this->getCancelUrl(),
+            //     'pending' => $this->getSuccessUrl($paymentInstance->transaction),
+            // ],
+            'notification_url' => self::webhookUrl(),
+            'external_reference' => $cart->cart_hash,
         ]);
     }
+
+
 
 
     public function handleIPN(): void
@@ -290,6 +300,11 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
         return MercadoPagoRefund::processRemoteRefund($transaction, $amount, $args);
 
+    }
+
+    public static function webhookUrl(): string
+    {
+        return site_url('?fluent-cart=fct_payment_listener_ipn&method=mercado_pago');
     }
 
     public function getWebhookInstructions(): string
@@ -390,6 +405,13 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                         ],
                     ],
                 ]
+            ],
+            'enable_wallet_support' => [
+                'value' => false,
+                'label' => __('Enable Wallet Payment Support', 'mercado-pago-for-fluent-cart'),
+                'type' => 'checkbox',
+                'disabled' => true,
+                'description' => __('Mercado Pago Wallet payment support is disabled for now. Coming soon.', 'mercado-pago-for-fluent-cart'),
             ],
             'webhook_info' => [
                 'value' => $this->getWebhookInstructions(),
