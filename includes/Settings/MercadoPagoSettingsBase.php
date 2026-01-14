@@ -39,6 +39,8 @@ class MercadoPagoSettingsBase extends BaseGatewaySettings
             'test_access_token'  => '',
             'live_public_key'    => '',
             'live_access_token'  => '',
+            'test_webhook_secret' => '',
+            'live_webhook_secret' => '',
             'checkout_type'      => 'modal',
             'payment_mode'       => 'test',
             'enable_wallet_support' => false,
@@ -87,9 +89,9 @@ class MercadoPagoSettingsBase extends BaseGatewaySettings
         }
 
         if ($mode === 'test') {
-            $webhookSecretKey = $this->get('test_webhook_secret_key');
+            $webhookSecretKey = $this->get('test_webhook_secret');
         } else {
-            $webhookSecretKey = $this->get('live_webhook_secret_key');
+            $webhookSecretKey = $this->get('live_webhook_secret');
         }
 
         return $webhookSecretKey;

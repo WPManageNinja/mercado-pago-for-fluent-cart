@@ -20,7 +20,7 @@ use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
 class MercadoPagoWebhook
 {
-    private $currentResource = [];
+    private static $currentResource = [];
     private $currentOrder = null;
 
     public function init()
@@ -60,12 +60,13 @@ class MercadoPagoWebhook
             exit('Invalid signature / Verification failed');
         }
 
+
         // Mercado Pago sends notification type and ID
         $action = Arr::get($data, 'action');
         $resourceId = Arr::get($data, 'data.id');
 
         if (!$action || !$resourceId) {
-            http_response_code(400);
+            http_response_code(404);
             exit('Missing required webhook data');
         }
 
@@ -73,12 +74,13 @@ class MercadoPagoWebhook
         $order = $this->getFluentCartOrder($data, $action);
 
         if (!$order) {
-            http_response_code(404);
+            http_response_code(200);
             exit('Order not found');
         }
 
         // Convert type to event name
         $event = str_replace('.', '_', $action);
+
 
         if (has_action('fluent_cart/payments/mercado_pago/webhook_' . $event)) {
             do_action('fluent_cart/payments/mercado_pago/webhook_' . $event, [
@@ -116,33 +118,35 @@ class MercadoPagoWebhook
      */
     private function verifySignature($payload)
     {
-        $headerSignature = isset($_SERVER['HTTP_X_SIGNATURE']) ? $_SERVER['HTTP_X_SIGNATURE'] : '';
-        if (!$headerSignature) {
+        $xSignature = $_SERVER['HTTP_X_SIGNATURE'] ?? '';
+        $xRequestId = $_SERVER['HTTP_X_REQUEST_ID'] ?? '';
+
+        // Extract the "data.id" from the query params (compat for both forms)
+        $queryParams = $_GET;
+        $dataID = $queryParams['data_id'] ?? ($queryParams['data.id'] ?? '');
+
+        if (!$xSignature || !$xRequestId || !$dataID) {
             return false;
         }
 
-        // Parse signature, expecting format: ts=TIMESTAMP,v1=SIGNATURE
-        $signatureParts = [];
-        foreach (explode(',', $headerSignature) as $part) {
-            $pair = explode('=', trim($part), 2);
-            if (count($pair) == 2) {
-                $signatureParts[$pair[0]] = $pair[1];
-            }
+        // Parse signature for ts and v1 only (ignore other parts, stop early)
+        $ts = $hash = null;
+        foreach (explode(',', $xSignature) as $part) {
+            [$key, $value] = array_map('trim', explode('=', $part, 2) + [null, null]);
+            if ($key === 'ts') $ts = $value;
+            elseif ($key === 'v1') $hash = $value;
+            if ($ts !== null && $hash !== null) break;
         }
-        if (empty($signatureParts['ts']) || empty($signatureParts['v1'])) {
-            return false;
-        }
-        $signatureTimestamp = $signatureParts['ts'];
-        $signatureHash      = $signatureParts['v1'];
 
-        $secretKey = (new MercadoPagoSettingsBase())->getWebhookSecretKey('current');
-        if (!$secretKey) {
+        if ($ts === null || $hash === null) {
             return false;
         }
 
-        $computedSignature = hash_hmac('sha512', $payload, $secretKey);
+        $secret = (new MercadoPagoSettingsBase())->getWebhookSecretKey('current');
+        $manifest = "id:$dataID;request-id:$xRequestId;ts:$ts;";
 
-        return hash_equals($signatureHash, $computedSignature);
+        return hash_hmac('sha256', $manifest, $secret) === $hash;
+
     }
     
     private function fetchResource($type, $resourceId)
@@ -178,7 +182,8 @@ class MercadoPagoWebhook
 
     public function processPaymentUpdated($data)
     {
-        $mercadoPagoPayment = Arr::get($data, 'payload');
+        $mercadoPagoPayment = self::$currentResource;
+
         $mercadoPagoPaymentId = Arr::get($mercadoPagoPayment, 'id');
         $paymentStatus = Arr::get($mercadoPagoPayment, 'status');
 
@@ -219,7 +224,7 @@ class MercadoPagoWebhook
 
     public function processPaymentFailed($data)
     {
-        $mercadoPagoPayment = $this->currentResource;
+        $mercadoPagoPayment = self::$currentResource;
         $mercadoPagoPaymentId = Arr::get($mercadoPagoPayment, 'id');
         $paymentStatus = Arr::get($mercadoPagoPayment, 'status');
         $order = Arr::get($data, 'order');
@@ -264,7 +269,7 @@ class MercadoPagoWebhook
 
     public function processPaymentApproved($data)
     {
-        $mercadoPagoPayment = $this->currentResource;
+        $mercadoPagoPayment = self::$currentResource;
         $mercadoPagoPaymentId = Arr::get($mercadoPagoPayment, 'id');
         $paymentStatus = Arr::get($mercadoPagoPayment, 'status');
 
@@ -392,7 +397,7 @@ class MercadoPagoWebhook
 
     public function processPaymentRefunded($data)
     {
-        $mercadoPagoPayment = $this->currentResource;
+        $mercadoPagoPayment = self::$currentResource;
 
         $order = Arr::get($data, 'order');
         
@@ -474,10 +479,10 @@ class MercadoPagoWebhook
         $type = Arr::get($data, 'type');
         $id = Arr::get($data, 'data.id');
 
-        $this->currentResource = $this->fetchResource($type, $id);
+        self::$currentResource = $this->fetchResource($type, $id);
         
         if (in_array($type, ['payment', 'orders'])) {
-            $externalReference = Arr::get($this->currentResource, 'external_reference');
+            $externalReference = Arr::get(self::$currentResource, 'external_reference');
             
             if ($externalReference) {
                 $transaction = OrderTransaction::query()
@@ -492,14 +497,14 @@ class MercadoPagoWebhook
         }
 
         if (!$order && in_array($type, ['subscription.preapproval', 'subscription_preapproval'])) {
-            $vendorSubscriptionId = Arr::get($this->currentResource, 'id');    
+            $vendorSubscriptionId = Arr::get(self::$currentResource, 'id');    
             if ($vendorSubscriptionId) {
                 $subscription = Subscription::query()
                     ->where('vendor_subscription_id', $vendorSubscriptionId)
                     ->first();
                 
                 if (!$subscription) {
-                    $externalReference = Arr::get($this->currentResource, 'external_reference');
+                    $externalReference = Arr::get(self::$currentResource, 'external_reference');
 
                     if ($externalReference) {
                         $subscription = Subscription::query()
@@ -515,7 +520,7 @@ class MercadoPagoWebhook
         }
 
         if (!$order && in_array($type, ['subscription.authorized_payment', 'subscription_authorized_payment'])) {
-            $preapprovalId = Arr::get($this->currentResource, 'preapproval_id');
+            $preapprovalId = Arr::get(self::$currentResource, 'preapproval_id');
             
             if ($preapprovalId) {
                 $subscription = Subscription::query()
@@ -541,4 +546,3 @@ class MercadoPagoWebhook
         exit;
     }
 }
-
