@@ -156,6 +156,12 @@ class MercadoPagoCheckout {
                                             return reject(error);
                                         }
                                     } else if (response?.data?.payment?.status === 'pending') {
+
+                                        if (response?.data?.redirect_url) {
+                                            window.location.href = response?.data?.redirect_url;
+                                            return resolve();
+                                        }
+
                                        this.renderStatusScreenBrick(response?.data?.payment?.id, orderData?.transaction_hash, orderData?.order_hash);
 
                                     }

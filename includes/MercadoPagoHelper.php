@@ -128,19 +128,30 @@ class MercadoPagoHelper
         return $updateData;
     }
 
-    public static function formatPayerInfo($fcCustomer, $billingAddress)
+    public static function formatPayerInfo($fcCustomer, $billingAddress, $mpFormData)
     {
        $payerInfo = [
-        'first_name' => $fcCustomer->first_name,
-        'last_name'  => $fcCustomer->last_name,
+        'email' => Arr::get($mpFormData, 'payer.email', $fcCustomer->email),
+        'first_name' => Arr::get($mpFormData, 'payer.first_name', $fcCustomer->first_name),
+        'last_name'  => Arr::get($mpFormData, 'payer.last_name', $fcCustomer->last_name),
        ];
 
         if ($billingAddress) {
+            // federal unit is the state of the address , and it should
             $payerInfo['address'] = [
-                'zip_code'     => $billingAddress->postcode ?? '',
-                'street_name'  => $billingAddress->address_1 ?? '',
-                'city'         => $billingAddress->city ?? '',
-                'street_number' => '',
+                'zip_code'     => Arr::get($mpFormData, 'payer.address.zip_code', $billingAddress->postcode ?? ''),
+                'street_name'  => Arr::get($mpFormData, 'payer.address.street_name', $billingAddress->address_1 ?? ''),
+                'city'         => Arr::get($mpFormData, 'payer.address.city', $billingAddress->city ?? ''),
+                'street_number' => Arr::get($mpFormData, 'payer.address.street_number', ''),
+                'neighborhood' => Arr::get($mpFormData, 'payer.address.neighborhood', ''),
+                'federal_unit' => Arr::get($mpFormData, 'payer.address.federal_unit', ''),
+            ];
+        }
+
+        if (Arr::get($mpFormData, key: 'payer.identification')) {
+            $payerInfo['identification'] = [
+                'type' => Arr::get($mpFormData, 'payer.identification.type', ''),
+                'number' => Arr::get($mpFormData, 'payer.identification.number', ''),
             ];
         }
        

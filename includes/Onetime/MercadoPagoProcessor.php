@@ -17,7 +17,7 @@ class MercadoPagoProcessor
         $mpSelectedPaymentMethod = sanitize_text_field(Arr::get(App::request()->all(), 'mp_selected_payment_method', ''));
 
 
-        $mpFormData = json_decode($mpFormData, true);
+        $mpFormData = json_decode($mpFormData, true) ?? [];
 
         $ipAddress = AddressHelper::getIpAddress();
 
@@ -31,7 +31,7 @@ class MercadoPagoProcessor
 
         // Format amount based on currency
         $amount = MercadoPagoHelper::formatAmount($transaction->total, $transaction->currency);
-        $payerInfo = MercadoPagoHelper::formatPayerInfo($fcCustomer, $order->billing_address);
+        $payerInfo = MercadoPagoHelper::formatPayerInfo($fcCustomer, $order->billing_address, $mpFormData);
 
         $paymentData = [
             'transaction_amount' => Arr::get($mpFormData, 'transaction_amount', 0),
@@ -40,23 +40,15 @@ class MercadoPagoProcessor
             'installments' => Arr::get($mpFormData, 'installments', 1),
             'payment_method_id' => Arr::get($mpFormData, 'payment_method_id', ''),
             'issuer_id' => Arr::get($mpFormData, 'issuer_id', ''),
-            'payer' => [
-                'email' => Arr::get($mpFormData, 'payer.email', $fcCustomer->email),
-                'first_name' => Arr::get($mpFormData, 'payer.first_name', $fcCustomer->first_name),
-                'last_name' => Arr::get($mpFormData, 'payer.last_name', $fcCustomer->last_name),
-            ],
+            'payer' => $payerInfo,
             'external_reference' => $transaction->uuid,
             'metadata' => [
                 'order_hash' => $order->uuid,
                 'transaction_hash' => $transaction->uuid,
             ],
             'notification_url' => $this->getWebhookUrl(),
+            'callback_url' => $transaction->getReceiptPageUrl(),
         ];
-
-        if (Arr::get($mpFormData, 'payer.identification')) {
-            $paymentData['payer']['identification']['type'] = Arr::get($mpFormData, 'payer.identification_type', '');
-            $paymentData['payer']['identification']['number'] = Arr::get($mpFormData, 'payer.identification.number', []);
-        }
 
         if (Arr::get($payerInfo, 'address')) {
             $paymentData['payer']['address'] = Arr::get($payerInfo, 'address', []);
@@ -72,7 +64,6 @@ class MercadoPagoProcessor
         $paymentData = array_filter($paymentData, function($value) {
             return !empty($value);
         });
-
 
         $result = MercadoPagoAPI::createMercadoPagoObject('v1/payments', $paymentData);
 
@@ -125,6 +116,7 @@ class MercadoPagoProcessor
                 ],
                 'mode' => 'onetime',
                 'receipt_page_url' => $transaction->getReceiptPageUrl(),
+                'redirect_url' => Arr::get($result, 'transaction_details.external_resource_url', ''), // we might remove this later
             ]
         ];
     }
