@@ -14,15 +14,11 @@ use FluentCart\App\Services\DateTime\DateTime;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 use MercadoPagoFluentCart\Confirmations\MercadoPagoConfirmations;
 use MercadoPagoFluentCart\MercadoPagoHelper;
-use MercadoPagoFluentCart\Subscriptions\MercadoPagoSubscriptions;
 use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
 class MercadoPagoWebhook
 {
-    private static $currentResource = [];
-    private $currentOrder = null;
-
     public function init()
     {
         // Payment webhooks (type: payment) - for one-time payment confirmation
@@ -54,24 +50,24 @@ class MercadoPagoWebhook
             exit('Invalid JSON payload');
         }
 
-
         if (!$this->verifySignature($data)) {
             http_response_code(401);
             exit('Invalid signature / Verification failed');
         }
 
-
         // Mercado Pago sends notification type and ID
         $action = Arr::get($data, 'action');
         $resourceId = Arr::get($data, 'data.id');
+        $type = Arr::get($data, 'type');
 
         if (!$action || !$resourceId) {
             http_response_code(404);
             exit('Missing required webhook data');
         }
 
+        $resource = $this->fetchResource($type, $resourceId);
 
-        $order = $this->getFluentCartOrder($data, $action);
+        $order = $this->getFluentCartOrder($data, $resource);
 
         if (!$order) {
             http_response_code(200);
@@ -81,11 +77,11 @@ class MercadoPagoWebhook
         // Convert type to event name
         $event = str_replace('.', '_', $action);
 
-
         if (has_action('fluent_cart/payments/mercado_pago/webhook_' . $event)) {
             do_action('fluent_cart/payments/mercado_pago/webhook_' . $event, [
                 'payload' => $data,
-                'order'   => $order
+                'order'   => $order,
+                'resource' => $resource
             ]);
 
             $this->sendResponse(200, 'Webhook processed successfully');
@@ -129,7 +125,6 @@ class MercadoPagoWebhook
             return false;
         }
 
-        // Parse signature for ts and v1 only (ignore other parts, stop early)
         $ts = $hash = null;
         foreach (explode(',', $xSignature) as $part) {
             [$key, $value] = array_map('trim', explode('=', $part, 2) + [null, null]);
@@ -182,17 +177,31 @@ class MercadoPagoWebhook
 
     public function processPaymentUpdated($data)
     {
-        $mercadoPagoPayment = self::$currentResource;
+        $mercadoPagoPayment = Arr::get($data, 'resource');
 
         $mercadoPagoPaymentId = Arr::get($mercadoPagoPayment, 'id');
         $paymentStatus = Arr::get($mercadoPagoPayment, 'status');
 
         $externalReference = Arr::get($mercadoPagoPayment, 'external_reference', '');
 
-        $transactionModel = OrderTransaction::query()
-            ->where('uuid', $externalReference)
-            ->where('payment_method', 'mercado_pago')
-            ->first();
+        $transactionModel = null;
+
+
+        if ($externalReference && !$transactionModel) {
+            $transactionModel = OrderTransaction::query()
+                ->where('uuid', operator: $externalReference)
+                ->where('payment_method', 'mercado_pago')
+                ->first();
+        }
+
+
+        if (!$transactionModel) {
+            $transactionModel = OrderTransaction::query()
+                ->where('vendor_charge_id', $mercadoPagoPaymentId)
+                ->where('payment_method', 'mercado_pago')
+                ->first();
+        }
+    
 
         if (!$transactionModel) {
             $this->sendResponse(404, 'Transaction not found for the provided reference.');
@@ -224,7 +233,7 @@ class MercadoPagoWebhook
 
     public function processPaymentFailed($data)
     {
-        $mercadoPagoPayment = self::$currentResource;
+        $mercadoPagoPayment = Arr::get($data, 'resource');
         $mercadoPagoPaymentId = Arr::get($mercadoPagoPayment, 'id');
         $paymentStatus = Arr::get($mercadoPagoPayment, 'status');
         $order = Arr::get($data, 'order');
@@ -269,7 +278,7 @@ class MercadoPagoWebhook
 
     public function processPaymentApproved($data)
     {
-        $mercadoPagoPayment = self::$currentResource;
+        $mercadoPagoPayment = Arr::get($data, 'resource');
         $mercadoPagoPaymentId = Arr::get($mercadoPagoPayment, 'id');
         $paymentStatus = Arr::get($mercadoPagoPayment, 'status');
 
@@ -321,13 +330,27 @@ class MercadoPagoWebhook
     public function processSubscriptionUpdate($data)
     {
         // Handles subscription creation, cancellation, and pause
-        $mercadoPagoSubscription = Arr::get($data, 'payload');
+        $mercadoPagoSubscription = Arr::get($data, 'resource');
+        $vendorSubscriptionId = Arr::get($mercadoPagoSubscription, 'id');
+        $externalReference = Arr::get($mercadoPagoSubscription, 'external_reference');
         
         $order = Arr::get($data, 'order');
 
         $subscriptionModel = Subscription::query()
-            ->where('parent_order_id', $order->id)
+            ->where('parent_order_id', operator: $order->id)
             ->first();
+
+        if (!$subscriptionModel) {
+            $subscriptionModel = Subscription::query()
+                ->where('vendor_subscription_id', $vendorSubscriptionId)
+                ->first();
+        }
+
+        if (!$subscriptionModel) {
+            $subscriptionModel = Subscription::query()
+                ->where('uuid', $externalReference)
+                ->first();
+        }
 
         
         if (!$subscriptionModel) {
@@ -374,16 +397,25 @@ class MercadoPagoWebhook
     public function processSubscriptionPayment($data)
     {
         // Handles recurring subscription payment received
-        $payment = Arr::get($data, 'payload');
+        $payment = Arr::get($data, 'resource');
         $subscriptionId = Arr::get($payment, 'preapproval_id');
+        $externalReference = Arr::get($payment, 'external_reference');
 
         if (!$subscriptionId) {
-            $this->sendResponse(400, 'No subscription ID found in payment');
+            $this->sendResponse(404, 'No subscription ID found in payment');
         }
 
         $subscriptionModel = Subscription::query()
             ->where('vendor_subscription_id', $subscriptionId)
             ->first();
+        
+        if (!$subscriptionModel) {
+            if ($externalReference) {
+                $subscriptionModel = Subscription::query()
+                        ->where('uuid', $externalReference)
+                        ->first();
+            }
+        }
 
         if (!$subscriptionModel) {
             $this->sendResponse(404, 'Subscription not found');
@@ -397,14 +429,13 @@ class MercadoPagoWebhook
 
     public function processPaymentRefunded($data)
     {
-        $mercadoPagoPayment = self::$currentResource;
-
+        $mercadoPagoPayment = Arr::get($data, 'resource');
         $order = Arr::get($data, 'order');
         
         $refunds = Arr::get($mercadoPagoPayment, 'refunds', []);
         
         if (empty($refunds)) {
-            $this->sendResponse(200, 'No refunds found in payment data.');
+            $this->sendResponse(404, 'No refunds found in payment data.');
         }
         
         $externalReference = Arr::get($mercadoPagoPayment, 'external_reference', '');
@@ -415,7 +446,7 @@ class MercadoPagoWebhook
             ->first();
         
         if (!$parentTransaction) {
-            $this->sendResponse(200, 'Parent transaction not found, skipping refund processing.');
+            $this->sendResponse(404, 'Parent transaction not found, skipping refund processing.');
         }
         
         $currentCreatedRefund = null;
@@ -473,16 +504,17 @@ class MercadoPagoWebhook
         $this->sendResponse(200, 'Refund processed successfully');
     }
 
-    public function getFluentCartOrder($data, $action)
+    public function getFluentCartOrder($data, $resource)
     {
         $order = null;
         $type = Arr::get($data, 'type');
-        $id = Arr::get($data, 'data.id');
 
-        self::$currentResource = $this->fetchResource($type, $id);
+        if (is_wp_error($resource)) {
+            return [];
+        }
         
         if (in_array($type, ['payment', 'orders'])) {
-            $externalReference = Arr::get(self::$currentResource, 'external_reference');
+            $externalReference = Arr::get($resource, 'external_reference');
             
             if ($externalReference) {
                 $transaction = OrderTransaction::query()
@@ -497,14 +529,14 @@ class MercadoPagoWebhook
         }
 
         if (!$order && in_array($type, ['subscription.preapproval', 'subscription_preapproval'])) {
-            $vendorSubscriptionId = Arr::get(self::$currentResource, 'id');    
+            $vendorSubscriptionId = Arr::get($resource, 'id');    
             if ($vendorSubscriptionId) {
                 $subscription = Subscription::query()
                     ->where('vendor_subscription_id', $vendorSubscriptionId)
                     ->first();
                 
                 if (!$subscription) {
-                    $externalReference = Arr::get(self::$currentResource, 'external_reference');
+                    $externalReference = Arr::get($resource, 'external_reference');
 
                     if ($externalReference) {
                         $subscription = Subscription::query()
@@ -520,7 +552,7 @@ class MercadoPagoWebhook
         }
 
         if (!$order && in_array($type, ['subscription.authorized_payment', 'subscription_authorized_payment'])) {
-            $preapprovalId = Arr::get(self::$currentResource, 'preapproval_id');
+            $preapprovalId = Arr::get($resource, 'preapproval_id');
             
             if ($preapprovalId) {
                 $subscription = Subscription::query()
