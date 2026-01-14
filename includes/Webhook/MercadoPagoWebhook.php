@@ -475,8 +475,7 @@ class MercadoPagoWebhook
         $id = Arr::get($data, 'data.id');
 
         $this->currentResource = $this->fetchResource($type, $id);
-
-        // Try to get external reference from payment or orders (one-time payments)
+        
         if (in_array($type, ['payment', 'orders'])) {
             $externalReference = Arr::get($this->currentResource, 'external_reference');
             

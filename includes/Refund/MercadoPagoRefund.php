@@ -65,7 +65,6 @@ class MercadoPagoRefund
         $totalRefunded = (float) Arr::get($payment, 'transaction_details.total_refunded', 0);
         $availableRefund = $totalPaid - $totalRefunded;
 
-        // Validate refund amount doesn't exceed available
         if ($formattedAmount > $availableRefund) {
             return new \WP_Error(
                 'mercadopago_refund_error',

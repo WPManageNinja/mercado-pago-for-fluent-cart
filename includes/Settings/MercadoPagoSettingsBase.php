@@ -7,7 +7,7 @@ use FluentCart\App\Helpers\Helper;
 use FluentCart\App\Modules\PaymentMethods\Core\BaseGatewaySettings;
 
 if (!defined('ABSPATH')) {
-    exit; // Direct access not allowed.
+    exit;
 }
 
 
@@ -62,7 +62,6 @@ class MercadoPagoSettingsBase extends BaseGatewaySettings
 
     public function getMode()
     {
-        // return store mode
         return (new StoreSettings)->get('order_mode');
     }
 

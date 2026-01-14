@@ -135,11 +135,10 @@ class MercadoPagoHelper
         'last_name'  => $fcCustomer->last_name,
        ];
 
-
         if ($billingAddress) {
             $payerInfo['address'] = [
-                'zip_code'     => $billingAddress->postal_code ?? '',
-                'street_name'  => $billingAddress->address_line_1 ?? '',
+                'zip_code'     => $billingAddress->postcode ?? '',
+                'street_name'  => $billingAddress->address_1 ?? '',
                 'city'         => $billingAddress->city ?? '',
                 'street_number' => '',
             ];

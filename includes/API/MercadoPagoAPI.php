@@ -5,7 +5,7 @@ namespace MercadoPagoFluentCart\API;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 
 if (!defined('ABSPATH')) {
-    exit; // Direct access not allowed.
+    exit;
 }
 
 
@@ -70,8 +70,12 @@ class MercadoPagoAPI
         $decoded = json_decode($body, true);
 
         $statusCode = wp_remote_retrieve_response_code($response);
-        
-        if ($statusCode >= 400) {
+
+        // give generic error on 500 status code
+        if ($statusCode === 500) {
+            return new \WP_Error('mercadopago_api_error', __('Mercado Pago API is temporarily unavailable. Please try again later.', 'mercado-pago-for-fluent-cart'), ['status' => $statusCode, 'response' => $decoded]);
+        }
+        else if ($statusCode >= 400) {
             $errorMessage = 'Unknown Mercado Pago API error';
             
             if (isset($decoded['message'])) {

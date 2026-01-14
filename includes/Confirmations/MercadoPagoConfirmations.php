@@ -13,7 +13,7 @@ use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
 
 if (!defined('ABSPATH')) {
-    exit; // Direct access not allowed.
+    exit;
 }
 
 class MercadoPagoConfirmations
@@ -86,9 +86,6 @@ class MercadoPagoConfirmations
         return new \WP_REST_Response($payment, 200);
     }
 
-    /**
-     * Create subscription via REST API (called from Payment Brick)
-     */
     public function createSubscriptionViaAPI(\WP_REST_Request $request)
     {
         $formData = $request->get_json_params();
@@ -170,9 +167,7 @@ class MercadoPagoConfirmations
         return new \WP_REST_Response($mercadoPagoSubscription, 200);
     }
 
-    /**
-     * Helper to convert FluentCart billing interval to Mercado Pago frequency type
-     */
+
     private function getFrequencyType($interval)
     {
         $map = [
@@ -185,11 +180,19 @@ class MercadoPagoConfirmations
         return $map[$interval] ?? 'months';
     }
 
-    /**
-     * Confirm one-time payment via AJAX (called from frontend after payment processing)
-     */
     public function confirmMercadoPagoSinglePayment()
     {
+         
+        if (isset($_REQUEST['mercadopago_fct_nonce'])) {
+            $nonce = sanitize_text_field(wp_unslash($_REQUEST['mercadopago_fct_nonce']));
+            if (!wp_verify_nonce($nonce, 'mercadopago_fct_nonce')) {
+                wp_send_json([
+                    'status'  => 'failed',
+                    'message' => __('Invalid nonce', 'mercado-pago-for-fluent-cart')
+                ], 400);
+            }
+        }
+
         $paymentId = isset($_REQUEST['payment_id']) ? sanitize_text_field(wp_unslash($_REQUEST['payment_id'])) : '';
         $transactionHash = isset($_REQUEST['transaction_hash']) ? sanitize_text_field(wp_unslash($_REQUEST['transaction_hash'])) : '';
 

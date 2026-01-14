@@ -6,8 +6,6 @@ use FluentCart\App\Services\Payments\PaymentInstance;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 use MercadoPagoFluentCart\MercadoPagoHelper;
 use FluentCart\App\App;
-use FluentCart\App\Helpers\Helper;
-use FluentCart\App\Helpers\Status;
 use FluentCart\App\Helpers\AddressHelper;
 use FluentCart\Framework\Support\Arr;
 
@@ -43,9 +41,9 @@ class MercadoPagoProcessor
             'payment_method_id' => Arr::get($mpFormData, 'payment_method_id', ''),
             'issuer_id' => Arr::get($mpFormData, 'issuer_id', ''),
             'payer' => [
-                'email' => $fcCustomer->email,
-                'first_name' => $fcCustomer->first_name,
-                'last_name' => $fcCustomer->last_name,
+                'email' => Arr::get($mpFormData, 'payer.email', $fcCustomer->email),
+                'first_name' => Arr::get($mpFormData, 'payer.first_name', $fcCustomer->first_name),
+                'last_name' => Arr::get($mpFormData, 'payer.last_name', $fcCustomer->last_name),
             ],
             'external_reference' => $transaction->uuid,
             'metadata' => [
@@ -133,7 +131,6 @@ class MercadoPagoProcessor
 
     public function getWebhookUrl()
     {
-        return 'https://webhook.fluentmonitor.com/webhook/sDB6ZTRm4vbs0VTPEMg3WAIO5lCNRzi4';
         return site_url('?fluent-cart=fct_payment_listener_ipn&method=mercado_pago');
     }
 }

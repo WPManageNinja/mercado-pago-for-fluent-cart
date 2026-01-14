@@ -13,6 +13,7 @@ class MercadoPagoCheckout {
         this.paymentBrickController = null;
         this.statusScreenBrickController = null;
         this.mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
+        this.isRendering = false;
     }
 
     translate(string) {
@@ -23,7 +24,7 @@ class MercadoPagoCheckout {
     async init() {
         // if already initialized, unmount it
         if (this.paymentBrickController) {
-            this.paymentBrickController.unmount();
+            await this.safeUnmount();
         }
 
         const ref = this;
@@ -64,6 +65,12 @@ class MercadoPagoCheckout {
     }
 
     async paymentHandler(ref, orderData, intentMode) {
+
+        if (this.isRendering) {
+            return;
+        }
+
+        this.isRendering = true;
         const that = this;
         const params = new URLSearchParams(window.location.search);
         const mode = params.get('mode') || 'order';
@@ -201,6 +208,8 @@ class MercadoPagoCheckout {
             }));
             that.showError(that.$t('Failed to initialize mercado pago payment form'));
             return;
+        } finally {
+            this.isRendering = false;
         }
     }
 
@@ -211,6 +220,7 @@ class MercadoPagoCheckout {
             payment_id: paymentId,
             transaction_hash : transactionHash,
             order_hash : orderHash,
+            mercadopago_fct_nonce: window.fct_mercadopago_data?.nonce,
         });
         
         return new Promise((resolve, reject) => {
@@ -417,35 +427,16 @@ class MercadoPagoCheckout {
         }
     }
 
-    unmount() {
-        if (this.paymentBrickController && typeof this.paymentBrickController.unmount === 'function') {
-            try {
-                this.paymentBrickController.unmount();
-            } catch (error) {
-                console.warn('Error unmounting MercadoPago payment brick:', error);
+    async safeUnmount() {
+        try {
+            if (this.paymentBrickController) {
+                await this.paymentBrickController.unmount();
             }
+        } catch (e) {
+            console.warn(e);
+        } finally {
             this.paymentBrickController = null;
         }
-
-        if (window.paymentBrickController && typeof window.paymentBrickController.unmount === 'function') {
-            try {
-                window.paymentBrickController.unmount();
-            } catch (error) {
-                console.warn('Error unmounting global MercadoPago payment brick:', error);
-            }
-            window.paymentBrickController = null;
-        }
-
-        // Remove the brick container
-        const brickContainer = document.getElementById('paymentBrick_container');
-        if (brickContainer && brickContainer.parentNode) {
-            brickContainer.parentNode.removeChild(brickContainer);
-        }
-        
-        this.cleanupMercadoPagoFormData();
-
-        this.mp = null;
-        this.bricksBuilder = null;
     }
 }
 
