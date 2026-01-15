@@ -44,6 +44,7 @@ class MercadoPagoSettingsBase extends BaseGatewaySettings
             'checkout_type'      => 'modal',
             'payment_mode'       => 'test',
             'enable_wallet_support' => false,
+            'subscription_billing_day' => null,
         ];
     }
 
@@ -108,6 +109,11 @@ class MercadoPagoSettingsBase extends BaseGatewaySettings
         } else {
             return $this->get('live_public_key');
         }
+    }
+
+    public function getBillingDay()
+    {
+        return $this->get('subscription_billing_day');
     }
 }
 

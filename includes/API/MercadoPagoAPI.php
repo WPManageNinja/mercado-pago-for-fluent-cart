@@ -3,6 +3,7 @@
 namespace MercadoPagoFluentCart\API;
 
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
+use FluentCart\Framework\Support\Arr;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -74,13 +75,9 @@ class MercadoPagoAPI
         // give generic error on 500 status code
         if ($statusCode === 500) {
             return new \WP_Error('mercadopago_api_error', __('Mercado Pago API is temporarily unavailable. Please try again later.', 'mercado-pago-for-fluent-cart'), ['status' => $statusCode, 'response' => $decoded]);
-        }
-
-        else if ($statusCode === 400 && $method === 'POST') {
-            return new \WP_Error('mercadopago_api_error', __('Address is not valid. Please check your address and try again. For State, use the abbreviation of the state. E.g.: SP for São Paulo, RJ for Rio de Janeiro, etc.', 'mercado-pago-for-fluent-cart'), ['status' => $statusCode, 'response' => $decoded]);
         } else if ($statusCode >= 400) {
             $errorMessage = 'Unknown Mercado Pago API error';
-            
+            $cause = Arr::get($decoded, 'cause', []);
             if (isset($decoded['message'])) {
                 $errorMessage = $decoded['message'];
             } elseif (isset($decoded['error'])) {
@@ -88,7 +85,11 @@ class MercadoPagoAPI
             } elseif (isset($decoded['cause'][0]['description'])) {
                 $errorMessage = $decoded['cause'][0]['description'];
             }
-            
+
+            if (count($cause) > 0) {
+                $errorMessage = $errorMessage . ' ' . implode(', ', $cause[0]);
+            }
+
             return new \WP_Error(
                 'mercadopago_api_error',
                 $errorMessage,

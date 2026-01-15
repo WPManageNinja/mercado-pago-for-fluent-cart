@@ -398,6 +398,12 @@ class MercadoPagoCheckout {
 
 
     cleanupMercadoPagoFormData() {
+        // remove error message if it exists
+        const existingError = this.mercadoPagoContainer.querySelector('.fct-error-message');
+        if (existingError) {
+            existingError.remove();
+        }
+
         if (this.mercadoPagoFormField && this.mercadoPagoFormField.parentNode) {
             this.mercadoPagoFormField.parentNode.removeChild(this.mercadoPagoFormField);
             this.mercadoPagoFormField = null;
