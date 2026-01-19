@@ -82,8 +82,8 @@ class MercadoPagoProcessor
         }
 
 
-        if (!in_array(Arr::get($result, 'status'), ['approved', 'authorized', 'pending'])) {
-            
+        if (!in_array(Arr::get($result, 'status'), ['approved', 'authorized', 'pending', 'in_process'])) {
+ 
             return [
                 'status' => 'failed',
                 'message' => __('Payment failed', 'mercado-pago-for-fluent-cart'),
@@ -123,7 +123,7 @@ class MercadoPagoProcessor
 
     public function getWebhookUrl()
     {
-        return site_url('?fluent-cart=fct_payment_listener_ipn&method=mercado_pago');
+        return site_url('?fluent-cart=fct_payment_listener_ipn&method=mercado_pago&source_news=webhooks');
     }
 }
 
