@@ -86,6 +86,19 @@ class MercadoPagoCheckout {
         brickContainer.id = 'paymentBrick_container';
         this.mercadoPagoContainer.appendChild(brickContainer);
 
+        let paymentMethods = {
+            bankTransfer: "all",
+            creditCard: "all",
+            prepaidCard: "all",
+            debitCard: "all",
+            mercadoPago: "all",
+        };
+
+        // if boletto is enabled, add it to the payment methods
+        if (this.data?.payment_args?.boleto_payment_enabled) {
+            paymentMethods.ticket = "all";
+        }
+
         const settings = {
             initialization: {
                 amount: Number(this.data?.intent?.amount || 0),
@@ -97,14 +110,7 @@ class MercadoPagoCheckout {
                         theme: 'default',
                     },
                 },
-                paymentMethods: {
-                    ticket: "all",
-                    bankTransfer: "all",
-                    creditCard: "all",
-                    prepaidCard: "all",
-                    debitCard: "all",
-                    mercadoPago: "all",
-                },
+                paymentMethods: paymentMethods,
             },
             callbacks: {
                 onReady: () => {
@@ -157,10 +163,10 @@ class MercadoPagoCheckout {
                                         }
                                     } else if (response?.data?.payment?.status === 'pending' || response?.data?.payment?.status === 'in_process') {
 
-                                        if (response?.data?.redirect_url) {
-                                            window.location.href = response?.data?.redirect_url;
-                                            return resolve();
-                                        }
+                                        // if (response?.data?.redirect_url) {
+                                        //     window.location.href = response?.data?.redirect_url;
+                                        //     return resolve();
+                                        // }
 
                                        this.renderStatusScreenBrick(response?.data?.payment?.id, orderData?.transaction_hash, orderData?.order_hash);
 
@@ -185,8 +191,12 @@ class MercadoPagoCheckout {
                     });
                 },
                 onError: (error) => {
-                    console.error('Payment Brick error:', error);
-                    that.showError(that.$t('Something went wrong'));
+                    if (error?.type == 'non_critical') {
+                        console.log('Non critical error:', error);
+                    } else {
+                        that.showError(that.$t('Something went wrong'));
+                    }
+                    
                 },
             },
         };

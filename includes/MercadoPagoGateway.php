@@ -32,14 +32,12 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         'payment',
         'refund',
         'webhook',
-        'subscriptions'
     ];
 
     public function __construct()
     {
         parent::__construct(
-            new MercadoPagoSettingsBase(),
-            new MercadoPagoSubscriptions()
+            new MercadoPagoSettingsBase()
         );
     }
 
@@ -131,6 +129,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
         $paymentArgs['public_key'] = $publicKey;
         $paymentArgs['locale'] = MercadoPagoHelper::determineLocale(CurrencySettings::get('currency'));
+        $paymentArgs['boleto_payment_enabled'] = $this->settings->get('boleto_payment_enabled') == 'yes';
 
         $paymentDetails = [
             'mode' => 'payment',
@@ -405,6 +404,12 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                         ],
                     ],
                 ]
+            ],
+            'boleto_payment_enabled' => [
+                'value' => true,
+                'label' => __('Enable Boleto Payment', 'mercado-pago-for-fluent-cart'),
+                'type' => 'checkbox',
+                'description' => __('Enable Boleto payment for your store.', 'mercado-pago-for-fluent-cart'),
             ],
             'enable_wallet_support' => [
                 'value' => false,

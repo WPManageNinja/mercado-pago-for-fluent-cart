@@ -44,7 +44,7 @@ class MercadoPagoSettingsBase extends BaseGatewaySettings
             'checkout_type'      => 'modal',
             'payment_mode'       => 'test',
             'enable_wallet_support' => false,
-            'subscription_billing_day' => null,
+            'boleto_payment_enabled' => true,
         ];
     }
 

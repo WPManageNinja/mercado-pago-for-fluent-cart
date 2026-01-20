@@ -257,6 +257,7 @@ class MercadoPagoConfirmations
         if ($paymentStatus === 'pending') {
             wp_send_json([
                 'status'  => 'pending',
+                'redirect_url' => $transaction->getReceiptPageUrl(),
                 'message' => __('Payment not approved/authorized yet', 'mercado-pago-for-fluent-cart')
             ], 200);
         }
@@ -267,9 +268,7 @@ class MercadoPagoConfirmations
         ], 422);
     }
 
-    /**
-     * Confirm subscription via AJAX (called from frontend after subscription creation)
-     */
+ 
     public function confirmMercadoPagoSubscription()
     {
         $subscriptionId = isset($_REQUEST['subscription_id']) ? sanitize_text_field(wp_unslash($_REQUEST['subscription_id'])) : '';
@@ -325,9 +324,6 @@ class MercadoPagoConfirmations
         ], 422);
     }
 
-    /**
-     * Create payment via Mercado Pago API (called from frontend)
-     */
     public function createMercadoPagoPayment()
     {
         if (isset($_REQUEST['mercadopago_fct_nonce'])) {
