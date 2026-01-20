@@ -155,7 +155,7 @@ class MercadoPagoCheckout {
                                             that.cleanupMercadoPagoFormData();
                                             return reject(error);
                                         }
-                                    } else if (response?.data?.payment?.status === 'pending') {
+                                    } else if (response?.data?.payment?.status === 'pending' || response?.data?.payment?.status === 'in_process') {
 
                                         if (response?.data?.redirect_url) {
                                             window.location.href = response?.data?.redirect_url;
