@@ -324,8 +324,8 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
 
             $hasMore = Arr::get($transactions, 'meta.pagination.has_more');
             $next = Arr::get($transactions, 'meta.pagination.next');
-            $queryString = parse_url($next, PHP_URL_QUERY);
-            parse_str($queryString, $params);
+            $queryString = wp_parse_url($next, PHP_URL_QUERY);
+            wp_parse_str($queryString, $params);
             $after = $params['after'];
             $queryParams['after'] = $after;
         } while ($hasMore);

@@ -32,12 +32,14 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         'payment',
         'refund',
         'webhook',
+        'subscriptions',
     ];
 
     public function __construct()
     {
         parent::__construct(
-            new MercadoPagoSettingsBase()
+            new MercadoPagoSettingsBase(),
+            new MercadoPagoSubscriptions()
         );
     }
 
@@ -326,9 +328,9 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             __('Webhook URL:', 'mercado-pago-for-fluent-cart'),
             esc_html($webhook_url),
             sprintf(
-                __('Configure webhooks in your <a href="%1$s" target="_blank">%2$s</a>:', 'mercado-pago-for-fluent-cart'),
+                'Configure webhooks in your <a href="%1$s" target="_blank">%2$s</a>:',
                 esc_url($configureLink),
-                __('Mercado Pago Developer Dashboard', 'mercado-pago-for-fluent-cart')
+                'Mercado Pago Developer Dashboard'
             ),
             __('Go to Your integrations > Select your application > Webhooks', 'mercado-pago-for-fluent-cart'),
             __('Enter the webhook URL above in "Production mode URL" or "Test mode URL"', 'mercado-pago-for-fluent-cart'),
