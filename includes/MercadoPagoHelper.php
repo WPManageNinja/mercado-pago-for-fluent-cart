@@ -146,6 +146,11 @@ class MercadoPagoHelper
                 'neighborhood' => Arr::get($mpFormData, 'payer.address.neighborhood', ''),
                 'federal_unit' => Arr::get($mpFormData, 'payer.address.federal_unit', ''),
             ];
+
+            if (Arr::get($mpFormData, 'payment_method_id') === 'bolbradesco' && Arr::get($mpFormData, 'payer.address.federal_unit', '')) {
+                $payerInfo['address']['federal_unit'] = self::resolveBrazilianUF(Arr::get($mpFormData, 'payer.address.federal_unit', '')) ?? Arr::get($mpFormData, 'payer.address.federal_unit', '');
+            }
+
         }
 
         if (Arr::get($mpFormData, key: 'payer.identification')) {
@@ -157,6 +162,51 @@ class MercadoPagoHelper
        
 
        return $payerInfo;
+    }
+
+    public static function resolveBrazilianUF(?string $input): ?string
+    {
+        if (!$input) {
+            return null;
+        }
+        
+        // Case 1: already a valid UF code
+        if (preg_match('/^[a-z]{2}$/', $input)) {
+            return strtoupper($input);
+        }
+
+        $BRAZIL_UF_MAP = [
+            'Acre' => 'AC',
+            'Alagoas' => 'AL',
+            'Amapá' => 'AP',
+            'Amazonas' => 'AM',
+            'Bahia' => 'BA',
+            'Ceará' => 'CE',
+            'Distrito Federal' => 'DF',
+            'Espírito Santo' => 'ES',
+            'Goiás' => 'GO',
+            'Maranhão' => 'MA',
+            'Mato Grosso' => 'MT',
+            'Mato Grosso do Sul' => 'MS',
+            'Minas Gerais' => 'MG',
+            'Pará' => 'PA',
+            'Paraíba' => 'PB',
+            'Paraná' => 'PR',
+            'Pernambuco' => 'PE',
+            'Piauí' => 'PI',
+            'Rio de Janeiro' => 'RJ',
+            'Rio Grande do Norte' => 'RN',
+            'Rio Grande do Sul' => 'RS',
+            'Rondônia' => 'RO',
+            'Roraima' => 'RR',
+            'Santa Catarina' => 'SC',
+            'São Paulo' => 'SP',
+            'Sergipe' => 'SE',
+            'Tocantins' => 'TO',
+        ];
+
+        // Case 2: full state name
+        return $BRAZIL_UF_MAP[$input] ?? null;
     }
 
     public static function determineLocale($currency = '')

@@ -71,7 +71,6 @@ class MercadoPagoAPI
 
         $statusCode = wp_remote_retrieve_response_code($response);
 
-        // give generic error on 500 status code
         if ($statusCode === 500) {
             return new \WP_Error('mercadopago_api_error', __('Mercado Pago API is temporarily unavailable. Please try again later.', 'mercado-pago-for-fluent-cart'), ['status' => $statusCode, 'response' => $decoded]);
         }

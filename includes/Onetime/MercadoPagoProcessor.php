@@ -5,6 +5,7 @@ namespace MercadoPagoFluentCart\Onetime;
 use FluentCart\App\Services\Payments\PaymentInstance;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 use MercadoPagoFluentCart\MercadoPagoHelper;
+use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 use FluentCart\App\App;
 use FluentCart\App\Helpers\AddressHelper;
 use FluentCart\Framework\Support\Arr;
@@ -18,6 +19,21 @@ class MercadoPagoProcessor
 
 
         $mpFormData = json_decode($mpFormData, true) ?? [];
+
+        $paymentMethodId = Arr::get($mpFormData, 'payment_method_id', '');
+
+        if ($paymentMethodId === 'bolbradesco' && (new MercadoPagoSettingsBase())->get('boleto_payment_enabled') == 'no'){
+
+            return [
+                'status' => 'failed',
+                'message' => __('Boleto payment is not enabled', 'mercado-pago-for-fluent-cart'),
+                'data' => [
+                    'payment_data' => $mpFormData,
+                    'intent' => 'onetime'
+                ]
+            ];
+
+        }
 
         $ipAddress = AddressHelper::getIpAddress();
 
@@ -60,12 +76,14 @@ class MercadoPagoProcessor
             'transaction' => $transaction
         ]);
 
-        // unset every empty value from $paymentData
         $paymentData = array_filter($paymentData, function($value) {
             return !empty($value);
         });
 
+
         $result = MercadoPagoAPI::createMercadoPagoObject('v1/payments', $paymentData);
+
+        
 
         if (is_wp_error($result)) {
             return [
