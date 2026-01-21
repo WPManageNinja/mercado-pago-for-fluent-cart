@@ -14,7 +14,6 @@ use FluentCart\App\Services\Payments\PaymentInstance;
 use FluentCart\App\Modules\PaymentMethods\Core\AbstractPaymentGateway;
 use FluentCart\App\Services\PluginInstaller\PaymentAddonManager;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
-use MercadoPagoFluentCart\Subscriptions\MercadoPagoSubscriptions;
 use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
@@ -31,13 +30,13 @@ class MercadoPagoGateway extends AbstractPaymentGateway
     public array $supportedFeatures = [
         'payment',
         'refund',
-        'webhook',
+        'webhook'
     ];
 
     public function __construct()
     {
         parent::__construct(
-            new MercadoPagoSettingsBase()
+            new MercadoPagoSettingsBase(),
         );
     }
 
@@ -92,7 +91,13 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         ];
 
         if ($paymentInstance->subscription) {
-            return (new Subscriptions\MercadoPagoSubscriptions())->handleSubscription($paymentInstance, $paymentArgs);
+            // not handling subscriptions for now
+            // return (new Subscriptions\MercadoPagoSubscriptions())->handleSubscription($paymentInstance, $paymentArgs);
+
+            wp_send_json([
+                'status' => 'failed',
+                'message' => __('Subscriptions are not supported for Mercado Pago yet.', 'mercado-pago-for-fluent-cart')
+            ], 422);
         }
 
         return (new Onetime\MercadoPagoProcessor())->handleSinglePayment($paymentInstance, $paymentArgs);
@@ -326,9 +331,9 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             __('Webhook URL:', 'mercado-pago-for-fluent-cart'),
             esc_html($webhook_url),
             sprintf(
-                __('Configure webhooks in your <a href="%1$s" target="_blank">%2$s</a>:', 'mercado-pago-for-fluent-cart'),
+                'Configure webhooks in your <a href="%1$s" target="_blank">%2$s</a>:',
                 esc_url($configureLink),
-                __('Mercado Pago Developer Dashboard', 'mercado-pago-for-fluent-cart')
+                'Mercado Pago Developer Dashboard'
             ),
             __('Go to Your integrations > Select your application > Webhooks', 'mercado-pago-for-fluent-cart'),
             __('Enter the webhook URL above in "Production mode URL" or "Test mode URL"', 'mercado-pago-for-fluent-cart'),
@@ -449,4 +454,3 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         fluent_cart_api()->registerCustomPaymentMethod('mercado_pago', new self());
     }
 }
-

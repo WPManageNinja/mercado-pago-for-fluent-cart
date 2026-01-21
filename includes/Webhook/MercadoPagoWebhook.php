@@ -17,6 +17,10 @@ use MercadoPagoFluentCart\MercadoPagoHelper;
 use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 class MercadoPagoWebhook
 {
     public function init()
@@ -114,11 +118,10 @@ class MercadoPagoWebhook
      */
     private function verifySignature($payload)
     {
-        $xSignature = $_SERVER['HTTP_X_SIGNATURE'] ?? '';
-        $xRequestId = $_SERVER['HTTP_X_REQUEST_ID'] ?? '';
+        $xSignature = sanitize_text_field(wp_unslash($_SERVER['HTTP_X_SIGNATURE'] ?? ''));
+        $xRequestId = sanitize_text_field(wp_unslash($_SERVER['HTTP_X_REQUEST_ID'] ?? ''));
 
-        // Extract the "data.id" from the query params (compat for both forms)
-        $queryParams = $_GET;
+        $queryParams = $_GET; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         $dataID = $queryParams['data_id'] ?? ($queryParams['data.id'] ?? '');
 
         if (!$xSignature || !$xRequestId || !$dataID) {

@@ -24,11 +24,7 @@ class MercadoPagoHelper
         if (!in_array($currentCurrency, $supportedCurrencies)) {
             wp_send_json([
                 'status' => 'failed',
-                'message' => sprintf(
-                    __('Mercado Pago does not support %s currency. Supported currencies are: %s', 'mercado-pago-for-fluent-cart'),
-                    $currentCurrency,
-                    implode(', ', $supportedCurrencies)
-                )
+                'message' => __('Mercado Pago does not support currency', 'mercado-pago-for-fluent-cart') . ' ' . $currentCurrency,
             ], 400);
         }
 
@@ -231,4 +227,3 @@ class MercadoPagoHelper
 
     }
 }
-

@@ -51,10 +51,8 @@ class MercadoPagoRefund
         if ($paymentStatus !== 'approved') {
             return new \WP_Error(
                 'mercadopago_refund_error',
-                sprintf(
-                    __('Payment must be approved to process refund. Current status: %s', 'mercado-pago-for-fluent-cart'),
-                    $paymentStatus
-                )
+                    __('Payment must be approved to process refund. Current status', 'mercado-pago-for-fluent-cart') . ' ' . $paymentStatus
+                   
             );
         }
 
@@ -68,11 +66,7 @@ class MercadoPagoRefund
         if ($formattedAmount > $availableRefund) {
             return new \WP_Error(
                 'mercadopago_refund_error',
-                sprintf(
-                    __('Refund amount (%.2f) exceeds available refund amount (%.2f)', 'mercado-pago-for-fluent-cart'),
-                    $formattedAmount,
-                    $availableRefund
-                )
+                __('Refund amount', 'mercado-pago-for-fluent-cart') . ' ' . $formattedAmount . ' ' . __('exceeds available refund amount', 'mercado-pago-for-fluent-cart') . ' ' . $availableRefund
             );
         }
 
@@ -117,10 +111,7 @@ class MercadoPagoRefund
         if (!in_array($refundStatus, $acceptedStatus)) {
             return new \WP_Error(
                 'refund_failed', 
-                sprintf(
-                    __('Refund was rejected with status: %s. Please check your Mercado Pago account', 'mercado-pago-for-fluent-cart'),
-                    $refundStatus
-                )
+                __('Refund was rejected with status', 'mercado-pago-for-fluent-cart') . ' ' . $refundStatus . ' ' . __('Please check your Mercado Pago account', 'mercado-pago-for-fluent-cart')
             );
         }
 
@@ -190,4 +181,3 @@ class MercadoPagoRefund
     }
 
 }
-
