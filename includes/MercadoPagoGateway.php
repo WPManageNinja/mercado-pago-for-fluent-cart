@@ -327,7 +327,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             return $domain . '/subscription-plans/list';
         }
 
-        return $domain . '/subscription-plans/subscriptor-details?id=' . $subscription->vendor_subscription_id;
+        return $domain . '/subscription-plans/subscription-details?id=' . $subscription->vendor_subscription_id;
     }
 
     public function processRefund($transaction, $amount, $args)
