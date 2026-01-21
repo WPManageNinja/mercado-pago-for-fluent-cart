@@ -76,12 +76,6 @@ class MercadoPagoHelper
 
     public static function formatAmount($amount, $currency)
     {
-        $zeroDecimalCurrencies = ['CLP'];
-
-        if (in_array($currency, $zeroDecimalCurrencies)) {
-            return (float) round($amount);
-        }
-
         return (float) number_format($amount / 100, 2, '.', '');
     }
 
