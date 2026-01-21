@@ -295,10 +295,10 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         }
 
         if ($transaction->status === status::TRANSACTION_REFUNDED) {
-            return $domain . '/activities/refunds/' . $transaction->vendor_charge_id;
+            return $domain . '/activities?q=' . $transaction->vendor_charge_id;
         }
 
-        return $domain . '/activities/payments/' . $transaction->vendor_charge_id;
+        return $domain . '/activities?q=' . $transaction->vendor_charge_id;
     }
 
     public function getSubscriptionUrl($url, $data): string
@@ -325,7 +325,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             return $domain . '/subscription-plans/list';
         }
 
-        return $domain . '/subscription-plans/subscribed/' . $subscription->vendor_customer_id;
+        return $domain . '/subscription-plans/subscriptor-details?id=' . $subscription->vendor_subscription_id;
     }
 
     public function processRefund($transaction, $amount, $args)
