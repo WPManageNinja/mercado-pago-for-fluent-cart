@@ -33,6 +33,13 @@ class MercadoPagoCheckout {
             return;
         }
 
+
+        if (this.intentMode === 'subscription') {
+        //     console.log('handleSubscriptionMode');
+            this.handleSubscriptionMode(ref);
+            return;
+        }
+
         try {
             await this.loadMercadoPagoSDK();
             this.mp = new MercadoPago(this.publicKey, {
@@ -227,6 +234,68 @@ class MercadoPagoCheckout {
         } finally {
             this.isRendering = false;
         }
+    }
+
+    async handleSubscriptionMode(ref) {
+        const that = this;
+    
+
+        // Style the main container
+        this.mercadoPagoContainer.style.padding = '24px';
+        this.mercadoPagoContainer.style.textAlign = 'center';
+        this.mercadoPagoContainer.style.backgroundColor = '#f5f5f5';
+        this.mercadoPagoContainer.style.borderRadius = '8px';
+        this.mercadoPagoContainer.style.margin = '20px 0';
+
+        // Add icon
+        const icon = document.createElement('div');
+        icon.innerHTML = '🔒';
+        icon.style.fontSize = '48px';
+        icon.style.marginBottom = '16px';
+        this.mercadoPagoContainer.appendChild(icon);
+
+        // Add title
+        const title = document.createElement('h3');
+        title.textContent = this.$t('Secure Subscription Payment');
+        title.style.marginBottom = '12px';
+        title.style.color = '#333';
+        this.mercadoPagoContainer.appendChild(title);
+
+        // Add description
+        const description = document.createElement('p');
+        description.textContent = this.$t("You will be redirected to Mercado Pago's secure payment page to complete your subscription. Your subscription will be processed safely through Mercado Pago's encrypted platform.");
+        description.style.marginBottom = '20px';
+        description.style.color = '#666';
+        description.style.lineHeight = '1.6';
+        this.mercadoPagoContainer.appendChild(description);
+
+        // add a button to handle orderHandler
+        const orderHandlerButton = document.createElement('button');
+        orderHandlerButton.id = 'mp_fct_order_handler_button';
+        orderHandlerButton.className = 'mp-order-handler-button';
+        orderHandlerButton.textContent = this.$t('Handle Order');
+        orderHandlerButton.style.marginBottom = '20px';
+        orderHandlerButton.style.color = '#666';
+        orderHandlerButton.style.lineHeight = '1.6';
+        this.mercadoPagoContainer.appendChild(orderHandlerButton);
+
+        window.dispatchEvent(new CustomEvent('fluent_cart_payment_method_loading_success', {
+            detail: {
+                payment_method: 'mercado_pago'
+            }
+        }));
+
+
+        orderHandlerButton.addEventListener('click', async () => {
+            if (typeof ref.orderHandler === 'function') {
+                const response = await ref.orderHandler();
+                if (response?.data?.redirect_url) {
+                    window.location.href = response?.data?.redirect_url;
+                } else {
+                    that.showError(response?.message || that.$t('Something went wrong'));
+                }
+            }
+        });
     }
 
     async confirmPayment(paymentId, transactionHash, orderHash) {
@@ -465,10 +534,13 @@ class MercadoPagoCheckout {
 window.mercadopagoCheckoutInstance = null;
 
 window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
+    console.log('fluent_cart_load_payments_mercado_pago', e);
     if (window.mercadopagoCheckoutInstance && typeof window.mercadopagoCheckoutInstance.unmount === 'function' && window.mercadopagoCheckoutInstance.mercadoPagoContainer) {
         window.mercadopagoCheckoutInstance.unmount();
         window.mercadopagoCheckoutInstance = null;
     }
+
+    console.log('fluent_cart_load_payments_mercado_pago 2', e);
 
     window.dispatchEvent(new CustomEvent('fluent_cart_payment_method_loading', {
         detail: {

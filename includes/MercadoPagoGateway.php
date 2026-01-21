@@ -14,6 +14,7 @@ use FluentCart\App\Services\Payments\PaymentInstance;
 use FluentCart\App\Modules\PaymentMethods\Core\AbstractPaymentGateway;
 use FluentCart\App\Services\PluginInstaller\PaymentAddonManager;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
+use MercadoPagoFluentCart\Subscriptions\MercadoPagoSubscriptions;
 use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
@@ -94,12 +95,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
         if ($paymentInstance->subscription) {
             // not handling subscriptions for now
-            // return (new Subscriptions\MercadoPagoSubscriptions())->handleSubscription($paymentInstance, $paymentArgs);
-
-            wp_send_json([
-                'status' => 'failed',
-                'message' => __('Subscriptions are not supported for Mercado Pago yet.', 'mercado-pago-for-fluent-cart')
-            ], 422);
+            return (new Subscriptions\MercadoPagoSubscriptions())->handleSubscription($paymentInstance, $paymentArgs);
         }
 
         return (new Onetime\MercadoPagoProcessor())->handleSinglePayment($paymentInstance, $paymentArgs);
