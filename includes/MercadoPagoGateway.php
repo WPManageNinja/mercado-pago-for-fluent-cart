@@ -297,10 +297,10 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         }
 
         if ($transaction->status === status::TRANSACTION_REFUNDED) {
-            return $domain . '/activities?q=' . $transaction->vendor_charge_id;
+            return $domain . '/activities';
         }
 
-        return $domain . '/activities?q=' . $transaction->vendor_charge_id;
+        return $domain . '/activities';
     }
 
     public function getSubscriptionUrl($url, $data): string
