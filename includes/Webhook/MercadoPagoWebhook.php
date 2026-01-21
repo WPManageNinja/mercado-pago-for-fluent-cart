@@ -29,12 +29,12 @@ class MercadoPagoWebhook
         add_action('fluent_cart/payments/mercado_pago/webhook_payment_approved', [$this, 'processPaymentApproved'], 10, 1);
         
         // Orders webhooks (type: orders) - for one-time payment confirmation (Checkout Transparente, Point, QR Code)
-        add_action('fluent_cart/payments/mercado_pago/webhook_orders_approved   ', [$this, 'processOrdersApproved'], 10, 1);
+        // add_action('fluent_cart/payments/mercado_pago/webhook_orders_approved   ', [$this, 'processOrdersApproved'], 10, 1);
 
         add_action('fluent_cart/payments/mercado_pago/webhook_payment_updated', [$this, 'processPaymentUpdated'], 10, 1);
 
-        add_action('fluent_cart/payments/mercado_pago/webhook_subscription_preapproval', [$this, 'processSubscriptionUpdate'], 10, 1); // Create/cancel subscription
-        add_action('fluent_cart/payments/mercado_pago/webhook_subscription_authorized_payment', [$this, 'processSubscriptionPayment'], 10, 1); // Recurring payment received
+        // add_action('fluent_cart/payments/mercado_pago/webhook_subscription_preapproval', [$this, 'processSubscriptionUpdate'], 10, 1); // Create/cancel subscription
+        // add_action('fluent_cart/payments/mercado_pago/webhook_subscription_authorized_payment', [$this, 'processSubscriptionPayment'], 10, 1); // Recurring payment received
         
         add_action('fluent_cart/payments/mercado_pago/webhook_payment_refunded', [$this, 'processPaymentRefunded'], 10, 1);
     }

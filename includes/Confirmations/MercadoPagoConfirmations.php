@@ -521,4 +521,3 @@ class MercadoPagoConfirmations
         ], 200);
     }
 }
-

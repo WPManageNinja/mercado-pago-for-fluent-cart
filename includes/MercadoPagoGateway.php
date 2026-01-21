@@ -14,7 +14,6 @@ use FluentCart\App\Services\Payments\PaymentInstance;
 use FluentCart\App\Modules\PaymentMethods\Core\AbstractPaymentGateway;
 use FluentCart\App\Services\PluginInstaller\PaymentAddonManager;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
-use MercadoPagoFluentCart\Subscriptions\MercadoPagoSubscriptions;
 use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
@@ -32,7 +31,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         'payment',
         'refund',
         'webhook',
-        'subscriptions',
+        'subscriptions'
     ];
 
     public function __construct()
@@ -94,7 +93,13 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         ];
 
         if ($paymentInstance->subscription) {
-            return (new Subscriptions\MercadoPagoSubscriptions())->handleSubscription($paymentInstance, $paymentArgs);
+            // not handling subscriptions for now
+            // return (new Subscriptions\MercadoPagoSubscriptions())->handleSubscription($paymentInstance, $paymentArgs);
+
+            wp_send_json([
+                'status' => 'failed',
+                'message' => __('Subscriptions are not supported for Mercado Pago yet.', 'mercado-pago-for-fluent-cart')
+            ], 422);
         }
 
         return (new Onetime\MercadoPagoProcessor())->handleSinglePayment($paymentInstance, $paymentArgs);
@@ -107,8 +112,6 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         $publicKey = (new Settings\MercadoPagoSettingsBase())->getPublicKey();
 
         if (empty($publicKey)) {
-            $message = __('Please provide a valid Public Key!', 'mercado-pago-for-fluent-cart');
-            fluent_cart_add_log('Mercado Pago Credential Validation', $message, 'error', ['log_type' => 'payment']);
             wp_send_json([
                 'status' => 'failed',
                 'message' => __('No valid Public Key found!', 'mercado-pago-for-fluent-cart')
@@ -158,6 +161,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'payment_args' => $paymentArgs,
             'intent' => $paymentDetails,
         ], 200);
+
     }
 
     public function createPreference($cartItems, $shippingCharge = 0, $tax = 0)
@@ -266,28 +270,64 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
     public function getTransactionUrl($url, $data): string
     {
+        
+
         $transaction = Arr::get($data, 'transaction', null);
-        if (!$transaction) {
-            return 'https://www.mercadopago.com/activities';
+
+        $suffixMap = [
+            'BRL' => 'br',
+            'MXN' => 'mx',
+            'COP' => 'co',
+            'CLP' => 'cl',
+            'ARS' => 'ar',
+            'PE' => 'pe',
+            'VE' => 've',
+        ];
+        $suffix = Arr::get($suffixMap, $transaction->currency, '');
+
+        if ($suffix) {
+            $domain = 'https://www.mercadopago.com.' . $suffix;
+        } else {
+            $domain = 'https://www.mercadopago.com';
         }
 
-        $paymentId = $transaction->vendor_charge_id;
+        $suffix = strtolower($transaction->currency);
+        if (!$transaction) {
+            return $domain . '/activities';
+        }
 
         if ($transaction->status === status::TRANSACTION_REFUNDED) {
-            return 'https://www.mercadopago.com/activities';
+            return $domain . '/activities?q=' . $transaction->vendor_charge_id;
         }
 
-        return 'https://www.mercadopago.com/activities';
+        return $domain . '/activities?q=' . $transaction->vendor_charge_id;
     }
 
     public function getSubscriptionUrl($url, $data): string
     {
         $subscription = Arr::get($data, 'subscription', null);
-        if (!$subscription || !$subscription->vendor_subscription_id) {
-            return 'https://www.mercadopago.com/subscriptions';
+        $suffixMap = [
+            'BRL' => 'br',
+            'MXN' => 'mx',
+            'COP' => 'co',
+            'CLP' => 'cl',
+            'ARS' => 'ar',
+            'PE' => 'pe',
+            'VE' => 've',
+        ];
+        $suffix = Arr::get($suffixMap, $subscription->currency, '');
+
+        if ($suffix) {
+            $domain = 'https://www.mercadopago.com.' . $suffix;
+        } else {
+            $domain = 'https://www.mercadopago.com';
         }
 
-        return 'https://www.mercadopago.com/subscriptions/' . $subscription->vendor_subscription_id;
+        if (!$subscription || !$subscription->vendor_customer_id) {
+            return $domain . '/subscription-plans/list';
+        }
+
+        return $domain . '/subscription-plans/subscriptor-details?id=' . $subscription->vendor_subscription_id;
     }
 
     public function processRefund($transaction, $amount, $args)
@@ -451,4 +491,3 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         fluent_cart_api()->registerCustomPaymentMethod('mercado_pago', new self());
     }
 }
-

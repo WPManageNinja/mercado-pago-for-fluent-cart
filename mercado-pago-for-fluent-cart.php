@@ -112,5 +112,3 @@ function mercadopago_fct_on_activation() {
         wp_cache_flush();
     }
 }
-
-

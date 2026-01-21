@@ -413,4 +413,3 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         return $intervalMap[$fluentcartInterval] ?? 'months';
     }
 }
-
