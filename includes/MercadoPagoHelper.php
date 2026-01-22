@@ -127,7 +127,6 @@ class MercadoPagoHelper
        ];
 
         if ($billingAddress) {
-            // federal unit is the state of the address , and it should
             $payerInfo['address'] = [
                 'zip_code'     => Arr::get($mpFormData, 'payer.address.zip_code', $billingAddress->postcode ?? ''),
                 'street_name'  => Arr::get($mpFormData, 'payer.address.street_name', $billingAddress->address_1 ?? ''),
@@ -138,9 +137,8 @@ class MercadoPagoHelper
             ];
 
             if (Arr::get($mpFormData, 'payment_method_id') === 'bolbradesco' && Arr::get($mpFormData, 'payer.address.federal_unit', '')) {
-                $payerInfo['address']['federal_unit'] = self::resolveBrazilianUF(Arr::get($mpFormData, 'payer.address.federal_unit', '')) ?? Arr::get($mpFormData, 'payer.address.federal_unit', '');
+                $payerInfo['address']['federal_unit'] = self::resolveBrazilianUF(Arr::get($mpFormData, 'payer.address.federal_unit', ''));
             }
-
         }
 
         if (Arr::get($mpFormData, key: 'payer.identification')) {
@@ -160,43 +158,55 @@ class MercadoPagoHelper
             return null;
         }
         
-        // Case 1: already a valid UF code
-        if (preg_match('/^[a-z]{2}$/', $input)) {
-            return strtoupper($input);
-        }
+        $input = trim($input);
 
-        $BRAZIL_UF_MAP = [
-            'Acre' => 'AC',
-            'Alagoas' => 'AL',
-            'Amapá' => 'AP',
-            'Amazonas' => 'AM',
-            'Bahia' => 'BA',
-            'Ceará' => 'CE',
-            'Distrito Federal' => 'DF',
-            'Espírito Santo' => 'ES',
-            'Goiás' => 'GO',
-            'Maranhão' => 'MA',
-            'Mato Grosso' => 'MT',
-            'Mato Grosso do Sul' => 'MS',
-            'Minas Gerais' => 'MG',
-            'Pará' => 'PA',
-            'Paraíba' => 'PB',
-            'Paraná' => 'PR',
-            'Pernambuco' => 'PE',
-            'Piauí' => 'PI',
-            'Rio de Janeiro' => 'RJ',
-            'Rio Grande do Norte' => 'RN',
-            'Rio Grande do Sul' => 'RS',
-            'Rondônia' => 'RO',
-            'Roraima' => 'RR',
-            'Santa Catarina' => 'SC',
-            'São Paulo' => 'SP',
-            'Sergipe' => 'SE',
-            'Tocantins' => 'TO',
+        $ufs = [
+            'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
         ];
 
-        // Case 2: full state name
-        return $BRAZIL_UF_MAP[$input] ?? null;
+        if (in_array($input, $ufs)) {
+            return $input;
+        }
+
+
+        $input = strtolower($input);
+
+
+        $BRAZIL_UF_MAP = [
+            'acre' => 'AC',
+            'alagoas' => 'AL',
+            'amapá' => 'AP',
+            'amazonas' => 'AM',
+            'bahia' => 'BA',
+            'ceará' => 'CE',
+            'distrito federal' => 'DF',
+            'espírito santo' => 'ES',
+            'goiás' => 'GO',
+            'maranhão' => 'MA',
+            'mato grosso' => 'MT',
+            'mato grosso do sul' => 'MS',
+            'minas gerais' => 'MG',
+            'pará' => 'PA',
+            'paraíba' => 'PB',
+            'paraná' => 'PR',
+            'pernambuco' => 'PE',
+            'piauí' => 'PI',
+            'rio de janeiro' => 'RJ',
+            'rio grande do norte' => 'RN',
+            'rio grande do sul' => 'RS',
+            'rondônia' => 'RO',
+            'roraima' => 'RR',
+            'santa catarina' => 'SC',
+            'são paulo' => 'SP',
+            'sergipe' => 'SE',
+            'tocantins' => 'TO',
+        ];
+
+        if (isset($BRAZIL_UF_MAP[$input])) {
+            return $BRAZIL_UF_MAP[$input];
+        }
+
+        return null;
     }
 
     public static function determineLocale($currency = '')
