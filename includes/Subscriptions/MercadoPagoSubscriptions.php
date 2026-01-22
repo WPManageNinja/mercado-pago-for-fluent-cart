@@ -192,8 +192,6 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
             }
         }
 
-        // Create new plan
-        $amount = MercadoPagoHelper::formatAmount($subscription->recurring_amount, $transaction->currency);
         
         // Map FluentCart interval to Mercado Pago frequency
         $frequency = $this->mapIntervalFrequency($subscription->billing_interval);
@@ -210,6 +208,8 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         $autoRecurringData = [
             'frequency'           => Arr::get($billingPeriod, 'interval_frequency'),
             'frequency_type'      => Arr::get($billingPeriod, 'interval_unit'),
+            'transaction_amount'  => MercadoPagoHelper::formatAmount($subscription->recurring_total, $transaction->currency),
+            'currency_id'         => strtoupper($transaction->currency),
         ];
 
         $billTimes = $subscription->billing_times;
@@ -235,9 +235,6 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         $planData = [
             'reason'              => $this->getPlanName($order) ?: $subscription->item_name,
             'auto_recurring'      => $autoRecurringData,
-            'transaction_amount'  => MercadoPagoHelper::formatAmount($subscription->recurring_total, $transaction->currency),
-            'currency_id'         => strtoupper($transaction->currency),
-            'back_url'            => Arr::get($paymentArgs, 'success_url'),
             'external_reference'  => $subscription->uuid,
         ];
 
