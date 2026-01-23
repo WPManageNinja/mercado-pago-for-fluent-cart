@@ -273,7 +273,7 @@ class MercadoPagoCheckout {
         const orderHandlerButton = document.createElement('button');
         orderHandlerButton.id = 'mp_fct_order_handler_button';
         orderHandlerButton.className = 'mp-order-handler-button';
-        orderHandlerButton.textContent = this.$t('Handle Order');
+        orderHandlerButton.textContent = this.$t('Place Order');
         orderHandlerButton.style.marginBottom = '20px';
         orderHandlerButton.style.color = '#666';
         orderHandlerButton.style.lineHeight = '1.6';

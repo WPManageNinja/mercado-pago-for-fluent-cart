@@ -230,4 +230,16 @@ class MercadoPagoHelper
         return $localesMap[$currency] ?? determine_locale();
 
     }
+
+    public static function mapSubscriptionStatus($mercadoPagoStatus)
+    {
+        $statusMap = [
+            'authorized' => Status::SUBSCRIPTION_ACTIVE,
+            'paused'     => Status::SUBSCRIPTION_PAUSED,
+            'cancelled'  => Status::SUBSCRIPTION_CANCELED,
+            'pending'    => Status::SUBSCRIPTION_PENDING,
+        ];
+
+        return $statusMap[$mercadoPagoStatus] ?? Status::SUBSCRIPTION_PENDING;
+    }
 }

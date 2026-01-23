@@ -115,7 +115,6 @@ class MercadoPagoProcessor
             ];
         }
 
-        // update transaction status  + vendor charge id
         $transaction->update([
             'vendor_charge_id' => Arr::get($result, 'id', ''),
         ]);
