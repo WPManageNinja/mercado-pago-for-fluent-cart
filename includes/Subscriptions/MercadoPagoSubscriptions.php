@@ -435,7 +435,7 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         if (Arr::get($response, 'id')) {
             $subscription->next_billing_date = $nextBillingDate;
             $subscription->status = $status;
-            $subscription->vendor_customer_id = Arr::get(array: $response, 'payer_id');
+            $subscription->vendor_customer_id = Arr::get($response, 'payer_id');
             $subscription->current_payment_method = 'mercado_pago';
             $subscription->vendor_subscription_id = Arr::get($response, 'id');
             $subscription->bill_count = $billCount;
