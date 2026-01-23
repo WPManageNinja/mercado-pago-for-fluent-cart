@@ -21,6 +21,8 @@ Before installing Mercado Pago for FluentCart, ensure you have:
   - 🇺🇾 UYU (Uruguayan Peso)
   - 🇺🇸 USD (US Dollar)
 
+> **⚠️ Important**: Your FluentCart store currency should match your Mercado Pago account's currency. Payments will always be processed in your Mercado Pago account currency, regardless of your FluentCart store currency. For example, if your Mercado Pago account is in Brazil (BRL) but your store shows prices in USD, customers will be charged in BRL. This can cause confusion and pricing discrepancies.
+
 ---
 
 ## Step 1: Install & Activate the Addon
@@ -74,6 +76,8 @@ You'll need credentials from your Mercado Pago account. Standard Mercado Pago ap
 ---
 
 ## Step 3: Configure Plugin Settings
+
+> **Before you begin**: Ensure your FluentCart store currency matches your Mercado Pago account currency. Payments always process in your Mercado Pago account's currency, so mismatches can confuse customers with unexpected currency conversions.
 
 1. Go to **FluentCart** → **Settings** → **Payment Methods** → **Mercado Pago**
 2. Select the appropriate tab:
@@ -239,6 +243,11 @@ The refund will be processed in Mercado Pago, and the customer will receive thei
 ### "Currency Not Supported" Error
 - Verify your store currency is one of the supported currencies (see Prerequisites)
 - Change your store currency in FluentCart settings if needed
+
+### Currency Mismatch Issues
+- Payments always process in your Mercado Pago account's currency
+- If your FluentCart store currency differs from your Mercado Pago account currency, customers may see unexpected charges
+- Ensure both currencies match to avoid customer confusion
 
 ### Payments Not Processing
 - Double-check your credentials are correct
