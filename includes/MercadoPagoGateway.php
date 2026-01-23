@@ -130,7 +130,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
         $paymentArgs['public_key'] = $publicKey;
         $paymentArgs['locale'] = MercadoPagoHelper::determineLocale(CurrencySettings::get('currency'));
-        $paymentArgs['boleto_payment_enabled'] = $this->settings->get('boleto_payment_enabled') == 'yes';
+        // $paymentArgs['boleto_payment_enabled'] = $this->settings->get('boleto_payment_enabled') == 'yes';
 
         $paymentDetails = [
             'mode' => 'payment',
@@ -253,6 +253,8 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                     'Pix' => __('Pix', 'mercado-pago-for-fluent-cart'),
                     'Boleto' => __('Boleto', 'mercado-pago-for-fluent-cart'),
                     'Something went wrong' => __('Something went wrong', 'mercado-pago-for-fluent-cart'),
+                    'Confirm After Payment' => __('Confirm After Payment', 'mercado-pago-for-fluent-cart'),
+                    'An error occurred while loading Mercado Pago.' => __('An error occurred while loading Mercado Pago.', 'mercado-pago-for-fluent-cart'),
                 ],
                 'nonce' => wp_create_nonce('mercadopago_fct_nonce')
             ]
@@ -443,12 +445,12 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                     ],
                 ]
             ],
-            'boleto_payment_enabled' => [
-                'value' => true,
-                'label' => __('Enable Boleto Payment', 'mercado-pago-for-fluent-cart'),
-                'type' => 'checkbox',
-                'description' => __('Enable Boleto payment for your store.', 'mercado-pago-for-fluent-cart'),
-            ],
+            // 'boleto_payment_enabled' => [
+            //     'value' => true,
+            //     'label' => __('Enable Boleto Payment', 'mercado-pago-for-fluent-cart'),
+            //     'type' => 'checkbox',
+            //     'description' => __('Enable Boleto payment for your store.', 'mercado-pago-for-fluent-cart'),
+            // ],
             'enable_wallet_support' => [
                 'value' => false,
                 'label' => __('Enable Wallet Payment Support', 'mercado-pago-for-fluent-cart'),
