@@ -255,6 +255,8 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                     'Pix' => __('Pix', 'mercado-pago-for-fluent-cart'),
                     'Boleto' => __('Boleto', 'mercado-pago-for-fluent-cart'),
                     'Something went wrong' => __('Something went wrong', 'mercado-pago-for-fluent-cart'),
+                    'Confirm After Payment' => __('Confirm After Payment', 'mercado-pago-for-fluent-cart'),
+                    'An error occurred while loading Mercado Pago.' => __('An error occurred while loading Mercado Pago.', 'mercado-pago-for-fluent-cart'),
                 ],
                 'nonce' => wp_create_nonce('mercadopago_fct_nonce')
             ]

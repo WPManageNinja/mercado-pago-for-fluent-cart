@@ -1,0 +1,399 @@
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Mercado Pago for FluentCart\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-23 05:13+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: \n"
+"Language: \n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Loco https://localise.biz/\n"
+"X-Loco-Version: 2.8.1; wp-6.9; php-8.4.11\n"
+"X-Domain: mercado-pago-for-fluent-cart"
+
+#. Description of the plugin
+msgid ""
+"Accept payments via Mercado Pago in FluentCart - supports one-time payments, "
+"subscriptions, and automatic refunds via webhooks."
+msgstr ""
+
+#: includes/API/MercadoPagoAPI.php:79
+msgid ""
+"Address is not valid. Please check your address and try again. For State, "
+"use the abbreviation of the state. E.g.: SP for São Paulo, RJ for Rio de "
+"Janeiro, etc."
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:259
+msgid "An error occurred while loading Mercado Pago."
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:405
+msgid "APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:411
+msgid "APP_USR-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:253
+msgid "Available payment methods on Checkout"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:256
+msgid "Boleto"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:254
+msgid "Cards"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:378
+msgid "Click Save - A <strong>secret signature</strong> will be generated"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:258
+msgid "Confirm After Payment"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:380
+msgid ""
+"Copy the generated secret signature and paste it in the \"Webhook Secret\" "
+"field above (for the corresponding mode). This is required to verify webhook "
+"authenticity and security."
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:458
+msgid "Enable Wallet Payment Support"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:376
+msgid ""
+"Enter the webhook URL above in \"Production mode URL\" or \"Test mode URL\""
+msgstr ""
+
+#: includes/Refund/MercadoPagoRefund.php:69
+msgid "exceeds available refund amount"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:513
+msgid "Failed to create subscription."
+msgstr ""
+
+#: includes/Refund/MercadoPagoRefund.php:45
+msgid "Failed to fetch payment details: "
+msgstr ""
+
+#: includes/Onetime/MercadoPagoProcessor.php:55
+msgid "Fct Order #"
+msgstr ""
+
+#. Author of the plugin
+msgid "FluentCart"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:418 includes/MercadoPagoGateway.php:444
+msgid ""
+"Found in Your integrations > Webhooks section. Used to verify webhook "
+"authenticity."
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:375
+msgid "Go to Your integrations > Select your application > Webhooks"
+msgstr ""
+
+#. URI of the plugin
+#. Author URI of the plugin
+msgid "https://fluentcart.com"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:379
+msgid "Important:"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:191
+#: includes/Confirmations/MercadoPagoConfirmations.php:279
+msgid "Invalid nonce"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:202
+msgid "Invalid payment confirmation request"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:297
+msgid "Invalid subscription confirmation request"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:409
+msgid "Live Access Token"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:398
+msgid "Live credentials"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:403
+msgid "Live Public Key"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:415
+msgid "Live Webhook Secret"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:252
+msgid "Loading Payment Processor..."
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:49
+msgid "Mercado Pago"
+msgstr ""
+
+#: includes/API/MercadoPagoAPI.php:75
+msgid "Mercado Pago API is temporarily unavailable. Please try again later."
+msgstr ""
+
+#: includes/MercadoPagoHelper.php:27
+msgid "Mercado Pago does not support currency"
+msgstr ""
+
+#. Name of the plugin
+#: mercado-pago-for-fluent-cart.php:34 mercado-pago-for-fluent-cart.php:48
+msgid "Mercado Pago for FluentCart"
+msgstr ""
+
+#: mercado-pago-for-fluent-cart.php:96
+msgid ""
+"Mercado Pago for FluentCart requires FluentCart to be installed and "
+"activated."
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:381
+msgid "Mercado Pago Payment Confirmation"
+msgstr ""
+
+#: includes/Webhook/MercadoPagoWebhook.php:501
+msgid "Mercado Pago Refund Processed"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:456
+msgid "Mercado Pago Subscription Confirmation"
+msgstr ""
+
+#: includes/Webhook/MercadoPagoWebhook.php:387
+msgid "Mercado Pago Subscription Updated"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:461
+msgid "Mercado Pago Wallet payment support is disabled for now. Coming soon."
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:115
+msgid "No valid Public Key found!"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:158
+msgid "Order info retrieved!"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:250
+msgid "Pay Now"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:54
+msgid "Pay securely with Mercado Pago - Card, Pix, Boleto, and more"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:267
+msgid "Payment confirmation failed"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:381
+msgid "Payment confirmation received from Mercado Pago. Payment ID:"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:252
+msgid "Payment confirmed successfully. Redirecting...!"
+msgstr ""
+
+#: includes/Onetime/MercadoPagoProcessor.php:107
+msgid "Payment failed"
+msgstr ""
+
+#: includes/Refund/MercadoPagoRefund.php:28
+msgid "Payment ID not found for refund"
+msgstr ""
+
+#: includes/Refund/MercadoPagoRefund.php:54
+msgid "Payment must be approved to process refund. Current status"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:261
+msgid "Payment not approved/authorized yet"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:255
+msgid "Pix"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:251
+msgid "Place Order"
+msgstr ""
+
+#: includes/Refund/MercadoPagoRefund.php:114
+msgid "Please check your Mercado Pago account"
+msgstr ""
+
+#: includes/Onetime/MercadoPagoProcessor.php:128
+msgid "Please complete your payment"
+msgstr ""
+
+#: includes/Subscriptions/MercadoPagoSubscriptions.php:93
+msgid "Please complete your subscription payment"
+msgstr ""
+
+#: mercado-pago-for-fluent-cart.php:97
+msgid "Plugin Activation Error"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:249
+msgid "Processing payment..."
+msgstr ""
+
+#: includes/Refund/MercadoPagoRefund.php:69
+msgid "Refund amount"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:338
+msgid "Refund amount is required."
+msgstr ""
+
+#: includes/Refund/MercadoPagoRefund.php:36
+msgid "Refund amount must be greater than zero"
+msgstr ""
+
+#: includes/Refund/MercadoPagoRefund.php:105
+msgid ""
+"Refund could not be processed in Mercado Pago. Please check your Mercado "
+"Pago account"
+msgstr ""
+
+#: includes/Refund/MercadoPagoRefund.php:114
+msgid "Refund was rejected with status"
+msgstr ""
+
+#: mercado-pago-for-fluent-cart.php:35
+msgid "requires FluentCart to be installed and activated."
+msgstr ""
+
+#: mercado-pago-for-fluent-cart.php:49
+msgid "requires FluentCart version 1.2.5 or higher"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:377
+msgid ""
+"Select these events: <strong>Payments</strong>, <strong>Orders</strong>, and "
+"<strong>Plans and Subscriptions</strong>"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:179
+msgid "Shipping Charge"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:257
+msgid "Something went wrong"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:390
+msgid "Store Mode notice"
+msgstr ""
+
+#: includes/Subscriptions/MercadoPagoSubscriptions.php:299
+msgid "Subscription cancelled successfully"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:456
+msgid "Subscription confirmation received from Mercado Pago. Subscription ID:"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:333
+msgid "Subscription confirmed"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:484
+msgid "Subscription data is required."
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:287
+msgid "Subscription ID and Ref ID are required"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:340
+msgid "Subscription not authorized yet"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:99
+msgid "Subscriptions are not supported for Mercado Pago yet."
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:187
+msgid "Tax"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:435
+msgid "Test Access Token"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:424
+msgid "Test credentials"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:429
+msgid "Test Public Key"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:441
+msgid "Test Webhook Secret"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:431
+msgid "TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:437
+msgid "TEST-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:98
+msgid "Transaction ID and Subscription ID are required"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:42
+msgid "Transaction ID is required"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:54
+#: includes/Confirmations/MercadoPagoConfirmations.php:214
+#: includes/Confirmations/MercadoPagoConfirmations.php:309
+msgid "Transaction not found"
+msgstr ""
+
+#: includes/Confirmations/MercadoPagoConfirmations.php:114
+msgid "Transaction or subscription not found"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:465
+msgid "Webhook Configuration"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:368
+msgid "Webhook URL:"
+msgstr ""
+
+#: includes/MercadoPagoGateway.php:417 includes/MercadoPagoGateway.php:443
+msgid "Your webhook secret signature"
+msgstr ""
