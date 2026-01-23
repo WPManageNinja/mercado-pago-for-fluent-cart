@@ -95,9 +95,9 @@ class MercadoPagoCheckout {
         };
 
         // if boletto is enabled, add it to the payment methods
-        if (this.data?.payment_args?.boleto_payment_enabled) {
+        // if (this.data?.payment_args?.boleto_payment_enabled) {
             paymentMethods.ticket = "all";
-        }
+        // }
 
         const settings = {
             initialization: {

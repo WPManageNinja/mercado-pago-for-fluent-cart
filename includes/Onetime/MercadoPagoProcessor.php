@@ -22,18 +22,18 @@ class MercadoPagoProcessor
 
         $paymentMethodId = Arr::get($mpFormData, 'payment_method_id', '');
 
-        if ($paymentMethodId === 'bolbradesco' && (new MercadoPagoSettingsBase())->get('boleto_payment_enabled') == 'no'){
+        // if ($paymentMethodId === 'bolbradesco' && (new MercadoPagoSettingsBase())->get('boleto_payment_enabled') == 'no'){
 
-            return [
-                'status' => 'failed',
-                'message' => __('Boleto payment is not enabled', 'mercado-pago-for-fluent-cart'),
-                'data' => [
-                    'payment_data' => $mpFormData,
-                    'intent' => 'onetime'
-                ]
-            ];
+        //     return [
+        //         'status' => 'failed',
+        //         'message' => __('Boleto payment is not enabled', 'mercado-pago-for-fluent-cart'),
+        //         'data' => [
+        //             'payment_data' => $mpFormData,
+        //             'intent' => 'onetime'
+        //         ]
+        //     ];
 
-        }
+        // }
 
         $ipAddress = AddressHelper::getIpAddress();
 
