@@ -342,7 +342,6 @@ class MercadoPagoCheckout {
                         return reject(error);
                     }
                 } else {
-                    console.log('xhr.status', xhr);
                     that.showError( xhr.statusText || that.$t('Network response was not ok'));
                     that.paymentLoader?.hideLoader();
                     that.paymentLoader?.enableCheckoutButton();
@@ -534,13 +533,11 @@ class MercadoPagoCheckout {
 window.mercadopagoCheckoutInstance = null;
 
 window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
-    console.log('fluent_cart_load_payments_mercado_pago', e);
+
     if (window.mercadopagoCheckoutInstance && typeof window.mercadopagoCheckoutInstance.unmount === 'function' && window.mercadopagoCheckoutInstance.mercadoPagoContainer) {
         window.mercadopagoCheckoutInstance.unmount();
         window.mercadopagoCheckoutInstance = null;
     }
-
-    console.log('fluent_cart_load_payments_mercado_pago 2', e);
 
     window.dispatchEvent(new CustomEvent('fluent_cart_payment_method_loading', {
         detail: {
@@ -564,7 +561,7 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         credentials: 'include'
     }).then(async (response) => {
         response = await response.json();
-        if (response?.status === 'failed') {
+        if (response?.status == 'failed') {
             window.dispatchEvent(new CustomEvent('fluent_cart_payment_method_loading_success', {
                 detail: {
                     payment_method: 'mercado_pago'
@@ -591,8 +588,10 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         errorDiv.className = 'fct-error-message';
         errorDiv.textContent = message;
 
-        if (this.mercadoPagoContainer) {
-            this.mercadoPagoContainer.appendChild(errorDiv);
+        mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
+
+        if (mercadoPagoContainer) {
+            mercadoPagoContainer.appendChild(errorDiv);
         }
 
         const loadingElement = document.getElementById('fct_loading_payment_processor');

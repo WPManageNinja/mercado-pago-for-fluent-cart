@@ -334,7 +334,6 @@ class MercadoPagoConfirmations
 
     public function confirmMercadoPagoSinglePayment()
     {
-         
         if (isset($_REQUEST['mercadopago_fct_nonce'])) {
             $nonce = sanitize_text_field(wp_unslash($_REQUEST['mercadopago_fct_nonce']));
             if (!wp_verify_nonce($nonce, 'mercadopago_fct_nonce')) {
@@ -369,7 +368,6 @@ class MercadoPagoConfirmations
 
         // Get payment details from Mercado Pago
         $payment = \MercadoPagoFluentCart\API\MercadoPagoAPI::getMercadoPagoObject('v1/payments/' . $paymentId);
-
 
         if (is_wp_error($payment)) {
             wp_send_json([
@@ -406,11 +404,11 @@ class MercadoPagoConfirmations
             );
         }
 
-        if ($paymentStatus === 'pending') {
+        if ($paymentStatus === 'pending' || $paymentStatus === 'in_process') {
             wp_send_json([
                 'status'  => 'pending',
                 'redirect_url' => $transaction->getReceiptPageUrl(),
-                'message' => __('Payment not approved/authorized yet', 'mercado-pago-for-fluent-cart')
+                'message' => __('Payment not approved/authorized yet, maybe in process or pending, please check back later.', 'mercado-pago-for-fluent-cart')
             ], 200);
         }
 

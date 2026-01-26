@@ -43,11 +43,6 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
             'vendor_plan_id' => Arr::get($plan, 'id'),
         ]);
 
-
-        ds([
-            'plan' => $plan,
-        ]);
-
         $init_point = Arr::get($plan, 'init_point');
 
         if ($init_point) {
