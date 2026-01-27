@@ -568,6 +568,7 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
                 }
             }));
 
+            console.error(response?.message);
             displayErrorMessage(response?.message);
 
             return;
@@ -588,7 +589,7 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         errorDiv.className = 'fct-error-message';
         errorDiv.textContent = message;
 
-        mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
+        let mercadoPagoContainer = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
 
         if (mercadoPagoContainer) {
             mercadoPagoContainer.appendChild(errorDiv);
