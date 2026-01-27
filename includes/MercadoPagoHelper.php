@@ -141,7 +141,7 @@ class MercadoPagoHelper
             }
         }
 
-        if (Arr::get($mpFormData, key: 'payer.identification')) {
+        if (Arr::get($mpFormData, 'payer.identification')) {
             $payerInfo['identification'] = [
                 'type' => Arr::get($mpFormData, 'payer.identification.type', ''),
                 'number' => Arr::get($mpFormData, 'payer.identification.number', ''),
@@ -222,7 +222,7 @@ class MercadoPagoHelper
             'CLP' => 'es-CL',
             'MXN' => 'es-MX',
             'COP' => 'es-CO',
-            'PEN' => 'es-PE',
+            'PEN' => 'es-PE', 
             'UYU' => 'es-UY',
             'USD' => 'en-US',
         ];
