@@ -42,7 +42,6 @@ class MercadoPagoHelper
             'COP', // Colombian Peso
             'PEN', // Peruvian Sol
             'UYU', // Uruguayan Peso
-            'USD', // US Dollar
         ];
     }
 
