@@ -94,7 +94,7 @@ class MercadoPagoCheckout {
             mercadoPago: "all",
         };
 
-        // if boletto is enabled, add it to the payment methods
+        // if boleto is enabled, add it to the payment methods
         // if (this.data?.payment_args?.boleto_payment_enabled) {
             paymentMethods.ticket = "all";
         // }
@@ -506,6 +506,8 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         displayErrorMessage(message);
     });
 
+    const container = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
+
     function displayErrorMessage(message) {
         const errorDiv = document.createElement('div');
         errorDiv.style.color = 'red';
@@ -513,8 +515,8 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         errorDiv.className = 'fct-error-message';
         errorDiv.textContent = message;
 
-        if (this.mercadoPagoContainer) {
-            this.mercadoPagoContainer.appendChild(errorDiv);
+        if (container) {
+            container.appendChild(errorDiv);
         }
 
         const loadingElement = document.getElementById('fct_loading_payment_processor');
@@ -524,13 +526,13 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
     }
 
     function addLoadingText() {
-        if (!this.mercadoPagoContainer) return;
+        if (!container) return;
 
         const loadingMessage = document.createElement('p');
         loadingMessage.id = 'fct_loading_payment_processor';
         loadingMessage.textContent = $t('Loading Payment Processor...');
         loadingMessage.style.textAlign = 'center';
         loadingMessage.style.padding = '20px';
-        mercadoPagoContainer.appendChild(loadingMessage);
+        container.appendChild(loadingMessage);
     }
 });
