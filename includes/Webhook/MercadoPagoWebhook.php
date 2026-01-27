@@ -122,7 +122,7 @@ class MercadoPagoWebhook
         $xRequestId = sanitize_text_field(wp_unslash($_SERVER['HTTP_X_REQUEST_ID'] ?? ''));
 
         $queryParams = $_GET; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        $dataID = sanitize_text_field(wp_unslash($queryParams['data.id'] ?? ''));
+        $dataID = $queryParams['data_id'] ?? ($queryParams['data.id'] ?? '');
 
         if (!$xSignature || !$xRequestId || !$dataID) {
             return false;

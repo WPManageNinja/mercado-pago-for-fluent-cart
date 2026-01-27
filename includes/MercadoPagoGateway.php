@@ -281,8 +281,8 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'CLP' => 'cl',
             'ARS' => 'ar',
             'PEN' => 'pe',
-            'VE' => 've',
             'UYU' => 'uy',
+            'USD' => 'ec',
         ];
         $suffix = Arr::get($suffixMap, $transaction->currency, '');
 

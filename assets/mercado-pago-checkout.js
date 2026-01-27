@@ -475,8 +475,6 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         return translations[string] || string;
     }
 
-    addLoadingText();
-
     fetch(e.detail.paymentInfoUrl, {
         method: "POST",
         headers: {
@@ -507,8 +505,6 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         displayErrorMessage(message);
     });
 
-    const container = document.querySelector('.fluent-cart-checkout_embed_payment_container_mercado_pago');
-
     function displayErrorMessage(message) {
         const errorDiv = document.createElement('div');
         errorDiv.style.color = 'red';
@@ -528,14 +524,4 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         }
     }
 
-    function addLoadingText() {
-        if (!container) return;
-
-        const loadingMessage = document.createElement('p');
-        loadingMessage.id = 'fct_loading_payment_processor';
-        loadingMessage.textContent = $t('Loading Payment Processor...');
-        loadingMessage.style.textAlign = 'center';
-        loadingMessage.style.padding = '20px';
-        container.appendChild(loadingMessage);
-    }
 });
