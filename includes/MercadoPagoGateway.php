@@ -280,8 +280,9 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'COP' => 'co',
             'CLP' => 'cl',
             'ARS' => 'ar',
-            'PE' => 'pe',
+            'PEN' => 'pe',
             'VE' => 've',
+            'UYU' => 'uy',
         ];
         $suffix = Arr::get($suffixMap, $transaction->currency, '');
 
@@ -291,11 +292,11 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             $domain = 'https://www.mercadopago.com';
         }
 
-        $suffix = strtolower($transaction->currency);
         if (!$transaction) {
             return $domain . '/activities';
         }
 
+        $suffix = strtolower($transaction->currency);
         if ($transaction->status === status::TRANSACTION_REFUNDED) {
             return $domain . '/activities';
         }
@@ -312,7 +313,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'COP' => 'co',
             'CLP' => 'cl',
             'ARS' => 'ar',
-            'PE' => 'pe',
+            'PEN' => 'pe',
             'VE' => 've',
         ];
         $suffix = Arr::get($suffixMap, $subscription->currency, '');
