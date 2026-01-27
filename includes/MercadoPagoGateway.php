@@ -219,6 +219,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             [
                 'handle' => 'mercadopago-sdk-js',
                 'src' => 'https://sdk.mercadopago.com/js/v2',
+                'version' => FLUTTERWAVE_FCT_VERSION
             ],
             [
                 'handle' => 'mercadopago-fluent-cart-checkout-handler',
