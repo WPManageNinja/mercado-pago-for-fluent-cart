@@ -342,6 +342,11 @@ class MercadoPagoConfirmations
                     'message' => __('Invalid nonce', 'mercado-pago-for-fluent-cart')
                 ], 400);
             }
+        } else {
+            wp_send_json([
+                'status'  => 'failed',
+                'message' => __('Nonce is required for security verification.', 'mercado-pago-for-fluent-cart')
+            ], 400);
         }
 
         $paymentId = isset($_REQUEST['payment_id']) ? sanitize_text_field(wp_unslash($_REQUEST['payment_id'])) : '';
@@ -430,6 +435,22 @@ class MercadoPagoConfirmations
     //             ], 400);
     //         }
     //     }
+    public function confirmMercadoPagoSubscription()
+    {
+        if (isset($_REQUEST['mercadopago_fct_nonce'])) {
+            $nonce = sanitize_text_field(wp_unslash($_REQUEST['mercadopago_fct_nonce']));
+            if (!wp_verify_nonce($nonce, 'mercadopago_fct_nonce')) {
+                wp_send_json([
+                    'status'  => 'failed',
+                    'message' => __('Invalid nonce', 'mercado-pago-for-fluent-cart')
+                ], 400);
+            }
+        } else {
+            wp_send_json([
+                'status'  => 'failed',
+                'message' => __('Nonce is required for security verification.', 'mercado-pago-for-fluent-cart')
+            ], 400);
+        }
 
     //     if (empty($_REQUEST['subscription_id']) || empty($_REQUEST['ref_id'])) {
     //         wp_send_json([

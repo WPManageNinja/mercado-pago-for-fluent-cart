@@ -141,6 +141,17 @@ class MercadoPagoWebhook
         }
 
         $secret = (new MercadoPagoSettingsBase())->getWebhookSecretKey('current');
+        if (!$secret) {
+            fluent_cart_add_log(
+                __('Mercado Pago Webhook Verification', 'mercado-pago-for-fluent-cart'),
+                __('Webhook secret is missing. Verification failed.', 'mercado-pago-for-fluent-cart'),
+                'error',
+                [
+                    'log_type' => 'payment'
+                ]
+            );
+            return false;
+        }
         $manifest = "id:$dataID;request-id:$xRequestId;ts:$ts;";
 
         return hash_hmac('sha256', $manifest, $secret) === $hash;

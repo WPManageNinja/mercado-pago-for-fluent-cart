@@ -51,8 +51,10 @@ class MercadoPagoRefund
         if ($paymentStatus !== 'approved') {
             return new \WP_Error(
                 'mercadopago_refund_error',
-                    __('Payment must be approved to process refund. Current status', 'mercado-pago-for-fluent-cart') . ' ' . $paymentStatus
-                   
+                sprintf(
+                    __('Payment must be approved to process refund. Current status: %s', 'mercado-pago-for-fluent-cart'),
+                    $paymentStatus
+                )
             );
         }
 

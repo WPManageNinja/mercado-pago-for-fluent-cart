@@ -68,8 +68,7 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         }
 
         // create card token if not exists
-        $card = $this->getOrCreateCard($fcCustomer, $mercadoPagoCustomer, $mpFormData);
-
+        $cardToken = $this->getOrCreateCard($fcCustomer, $mercadoPagoCustomer, $mpFormData);
 
         if (is_wp_error($cardToken)) {
             return $cardToken;
@@ -98,14 +97,14 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         // create subscription
         $mpSubscription = MercadoPagoAPI::createMercadoPagoObject('preapproval', $paymentData);
 
-
-        if (is_wp_error($subscription)) {
-            return $subscription;
+        if (is_wp_error($mpSubscription)) {
+            return $mpSubscription;
         }
 
         $subscription->update([
-            'vendor_subscription_id' => Arr::get($subscription, 'id'),
+            'vendor_subscription_id' => Arr::get($mpSubscription, 'id'),
         ]);
+        
         return [
             'status'       => 'success',
             'nextAction'   => 'mercado_pago',

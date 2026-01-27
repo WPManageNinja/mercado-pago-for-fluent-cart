@@ -101,7 +101,7 @@ class MercadoPagoCheckout {
             mercadoPago: "all",
         };
 
-        // if boletto is enabled, add it to the payment methods
+        // if boleto is enabled, add it to the payment methods
         // if (this.data?.payment_args?.boleto_payment_enabled) {
             paymentMethods.ticket = "all";
         // }
@@ -550,8 +550,6 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         return translations[string] || string;
     }
 
-    addLoadingText();
-
     fetch(e.detail.paymentInfoUrl, {
         method: "POST",
         headers: {
@@ -601,14 +599,4 @@ window.addEventListener("fluent_cart_load_payments_mercado_pago", function (e) {
         }
     }
 
-    function addLoadingText() {
-        if (!this.mercadoPagoContainer) return;
-
-        const loadingMessage = document.createElement('p');
-        loadingMessage.id = 'fct_loading_payment_processor';
-        loadingMessage.textContent = $t('Loading Payment Processor...');
-        loadingMessage.style.textAlign = 'center';
-        loadingMessage.style.padding = '20px';
-        mercadoPagoContainer.appendChild(loadingMessage);
-    }
 });
