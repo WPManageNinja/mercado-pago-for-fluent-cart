@@ -192,7 +192,7 @@ class MercadoPagoWebhook
 
         if ($externalReference && !$transactionModel) {
             $transactionModel = OrderTransaction::query()
-                ->where('uuid', operator: $externalReference)
+                ->where('uuid', $externalReference)
                 ->where('payment_method', 'mercado_pago')
                 ->first();
         }
@@ -312,11 +312,11 @@ class MercadoPagoWebhook
         }
 
         $billingInfo = [
-            'type'                => Arr::get(array: $mercadoPagoPayment, key: 'payment_type_id', default: 'card'),
+            'type'                => Arr::get( $mercadoPagoPayment, 'payment_type_id'),
             'last4'               => Arr::get($mercadoPagoPayment, 'card.last_four_digits'),
-            'brand'               => Arr::get(array: $mercadoPagoPayment, key: 'payment_method_id'),
-            'payment_method_id'   => Arr::get(array: $mercadoPagoPayment, key: 'payment_method_id'),
-            'payment_method_type' => Arr::get(array: $mercadoPagoPayment, key: 'payment_type_id'),
+            'brand'               => Arr::get( $mercadoPagoPayment,  'payment_method_id'),
+            'payment_method_id'   => Arr::get( $mercadoPagoPayment,  'payment_method_id'),
+            'payment_method_type' => Arr::get( $mercadoPagoPayment,  'payment_type_id'),
         ];
 
 
@@ -340,7 +340,7 @@ class MercadoPagoWebhook
         $order = Arr::get($data, 'order');
 
         $subscriptionModel = Subscription::query()
-            ->where('parent_order_id', operator: $order->id)
+            ->where('parent_order_id', $order->id)
             ->first();
 
         if (!$subscriptionModel) {
