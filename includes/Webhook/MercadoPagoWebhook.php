@@ -356,23 +356,43 @@ class MercadoPagoWebhook
         // Handles subscription creation, activation, cancellation, and pause
         $mercadoPagoSubscription = Arr::get($data, 'resource');
         $vendorSubscriptionId = Arr::get($mercadoPagoSubscription, 'id');
+        $preapprovalPlanId = Arr::get($mercadoPagoSubscription, 'preapproval_plan_id');
+        $payerEmail = Arr::get($mercadoPagoSubscription, 'payer_email');
         $externalReference = Arr::get($mercadoPagoSubscription, 'external_reference');
         
         $order = Arr::get($data, 'order');
 
-        $subscriptionModel = Subscription::query()
-            ->where('parent_order_id', $order->id)
-            ->first();
+        // Strategy 1: Find by order (if order was found via getFluentCartOrder)
+        $subscriptionModel = null;
+        if ($order) {
+            $subscriptionModel = Subscription::query()
+                ->where('parent_order_id', $order->id)
+                ->first();
+        }
 
+        // Strategy 2: Find by vendor_subscription_id (if already linked)
         if (!$subscriptionModel) {
             $subscriptionModel = Subscription::query()
                 ->where('vendor_subscription_id', $vendorSubscriptionId)
                 ->first();
         }
 
-        if (!$subscriptionModel) {
+        // Strategy 3: Find by external_reference (if subscription was created with it via API)
+        if (!$subscriptionModel && $externalReference) {
             $subscriptionModel = Subscription::query()
                 ->where('uuid', $externalReference)
+                ->first();
+        }
+
+        // Strategy 4: Find by vendor_plan_id (preapproval_plan_id)
+        // Note: external_reference is NOT inherited from plan to subscription when user
+        // subscribes via init_point, so we need to match by plan ID
+        if (!$subscriptionModel && $preapprovalPlanId) {
+            $subscriptionModel = Subscription::query()
+                ->where('vendor_plan_id', $preapprovalPlanId)
+                ->where('current_payment_method', 'mercado_pago')
+                ->whereNull('vendor_subscription_id') // Not yet linked
+                ->orderBy('created_at', 'desc')
                 ->first();
         }
 
@@ -837,23 +857,63 @@ class MercadoPagoWebhook
         }
 
         if (!$order && in_array($type, ['subscription.preapproval', 'subscription_preapproval'])) {
-            $vendorSubscriptionId = Arr::get($resource, 'id');    
+            $vendorSubscriptionId = Arr::get($resource, 'id');
+            $preapprovalPlanId = Arr::get($resource, 'preapproval_plan_id');
+            $payerEmail = Arr::get($resource, 'payer_email');
+            
+            // Strategy 1: Find by vendor_subscription_id (if already stored)
             if ($vendorSubscriptionId) {
                 $subscription = Subscription::query()
                     ->where('vendor_subscription_id', $vendorSubscriptionId)
                     ->first();
                 
-                if (!$subscription) {
-                    $externalReference = Arr::get($resource, 'external_reference');
-
-                    if ($externalReference) {
-                        $subscription = Subscription::query()
-                            ->where('uuid', $externalReference)
-                            ->first();         
+                if ($subscription) {
+                    $order = Order::query()->where('id', $subscription->parent_order_id)->first();
+                }
+            }
+            
+            // Strategy 2: Find by external_reference (if subscription was created with it)
+            if (!$order) {
+                $externalReference = Arr::get($resource, 'external_reference');
+                if ($externalReference) {
+                    $subscription = Subscription::query()
+                        ->where('uuid', $externalReference)
+                        ->first();
+                    
+                    if ($subscription) {
+                        $order = Order::query()->where('id', $subscription->parent_order_id)->first();
                     }
                 }
+            }
+            
+            // Strategy 3: Find by preapproval_plan_id (vendor_plan_id) + payer_email
+            // This is needed because external_reference is NOT inherited from plan to subscription
+            if (!$order && $preapprovalPlanId && $payerEmail) {
+                $subscription = Subscription::query()
+                    ->where('vendor_plan_id', $preapprovalPlanId)
+                    ->where('current_payment_method', 'mercado_pago')
+                    ->whereHas('order', function($query) use ($payerEmail) {
+                        $query->whereHas('customer', function($q) use ($payerEmail) {
+                            $q->where('email', $payerEmail);
+                        });
+                    })
+                    ->orderBy('created_at', 'desc')
+                    ->first();
                 
                 if ($subscription) {
+                    $order = Order::query()->where('id', $subscription->parent_order_id)->first();
+                }
+            }
+
+            // Strategy 4: Find by preapproval_plan_id only (if there's only one subscription for this plan)
+            if (!$order && $preapprovalPlanId) {
+                $subscriptions = Subscription::query()
+                    ->where('vendor_plan_id', $preapprovalPlanId)
+                    ->where('current_payment_method', 'mercado_pago')
+                    ->get();
+                
+                if ($subscriptions->count() === 1) {
+                    $subscription = $subscriptions->first();
                     $order = Order::query()->where('id', $subscription->parent_order_id)->first();
                 }
             }

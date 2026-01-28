@@ -98,7 +98,8 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
             $planData = [
                 'reason' => __('Reactivation of subscription ', 'mercado-pago-for-fluent-cart') . $this->getPlanName($order) ?: $subscription->item_name,
                 'auto_recurring' => $autoRecurringData,
-                'back_url' => $transaction->getReceiptPageUrl()
+                'back_url' => $transaction->getReceiptPageUrl(),
+                'external_reference' => $subscription->uuid,
             ];
 
             $plan = $this->getOrCreatePreApprovalPlan($paymentInstance, $planData);
@@ -108,9 +109,11 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
                 'reason' => __('New subscription ', 'mercado-pago-for-fluent-cart') . $this->getPlanName($order) ?: $subscription->item_name,
                 'auto_recurring' => $autoRecurringData,
                 'back_url' => $transaction->getReceiptPageUrl(),
+                'external_reference' => $subscription->uuid,
             ];
 
             $plan = $this->getOrCreatePreApprovalPlan($paymentInstance, $planData);
+
         }
 
 
