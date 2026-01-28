@@ -32,8 +32,87 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
 
         $mpSelectedPaymentMethod = sanitize_text_field(Arr::get(App::request()->all(), 'mp_selected_payment_method', ''));
 
-        // Get or create preapproval plan
-        $plan = $this->getOrCreatePreapprovalPlan($paymentInstance, $paymentArgs);
+        $planData = [];
+
+        $frequency = $this->mapIntervalFrequency($subscription->billing_interval);
+        $frequencyType = $this->mapIntervalType($subscription->billing_interval);
+
+        $billingPeriod = apply_filters('fluent_cart/mercadopago/subscription_billing_period', [
+            'interval_unit' => $frequencyType,
+            'interval_frequency' => $frequency,
+        ], [
+            'subscription_interval' => $subscription->billing_interval,
+            'payment_method' => 'mercado_pago',
+        ]);
+
+        $autoRecurringData = [
+            'frequency'           => Arr::get($billingPeriod, 'interval_frequency'),
+            'frequency_type'      => Arr::get($billingPeriod, 'interval_unit'),
+            'transaction_amount'  => MercadoPagoHelper::formatAmount($subscription->recurring_total, $transaction->currency),
+            'currency_id'         => strtoupper($transaction->currency),
+        ];
+
+        $billTimes = $subscription->billing_times;
+        if ($billTimes && $billTimes > 0) {
+            $autoRecurringData['repetitions'] = $billTimes;
+        }
+
+        $billingDay = (new MercadoPagoSettingsBase())->getBillingDay();
+
+        if ($billingDay && $billingDay > 0 && $billingDay <=28) {
+            $autoRecurringData['billing_day'] = $billingDay;
+        }
+
+        // trialing data
+        $trialDays = $subscription->trial_days;
+        if ($trialDays && $trialDays > 0) {
+            $autoRecurringData['free_trial'] = [
+                'frequency'      => (int) $trialDays,
+                'frequency_type' => 'days',
+            ];
+        }
+
+        if ($order->type == 'renewal') {
+
+            $requiredBillTimes = $subscription->getRequiredBillTimes();
+            $trialDays = $subscription->getReactivationTrialDays();
+            $recurringAmount = $subscription->getCurrentRenewalAmount();
+
+            if ($requiredBillTimes === -1) {
+                return new \WP_Error('already_completed', __('Invalid bill times for the subscription.', 'fluent-cart'));
+            }
+
+            if ($requiredBillTimes > 0) {
+                $autoRecurringData['repetitions'] = $requiredBillTimes;
+            }
+
+            if ($trialDays > 0) {
+                $autoRecurringData['free_trial'] = [
+                    'frequency'      => (int) $trialDays,
+                    'frequency_type' => 'days',
+                ];
+            }
+
+            $autoRecurringData['transaction_amount'] = MercadoPagoHelper::formatAmount($recurringAmount, $transaction->currency);
+
+            $planData = [
+                'reason' => __('Reactivation of subscription ', 'mercado-pago-for-fluent-cart') . $this->getPlanName($order) ?: $subscription->item_name,
+                'auto_recurring' => $autoRecurringData,
+                'back_url' => $transaction->getReceiptPageUrl()
+            ];
+
+            $plan = $this->getOrCreatePreApprovalPlan($paymentInstance, $planData);
+        } else {
+
+            $planData = [
+                'reason' => __('New subscription ', 'mercado-pago-for-fluent-cart') . $this->getPlanName($order) ?: $subscription->item_name,
+                'auto_recurring' => $autoRecurringData,
+                'back_url' => $transaction->getReceiptPageUrl(),
+            ];
+
+            $plan = $this->getOrCreatePreApprovalPlan($paymentInstance, $planData);
+        }
+
 
         if (is_wp_error($plan)) {
             return $plan;
@@ -65,66 +144,66 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
             'message' => __('Failed to create subscription plan', 'mercado-pago-for-fluent-cart'),
         ];
 
-        // end of the flow, as I am using the plan's init_point and redirecting
+        // // end of the flow, as I am using the plan's init_point and redirecting
 
-        $mercadoPagoCustomer = $this->getOrCreateCustomer($fcCustomer, $mpFormData, $billingAddress);
+        // $mercadoPagoCustomer = $this->getOrCreateCustomer($fcCustomer, $mpFormData, $billingAddress);
 
-        if (is_wp_error($mercadoPagoCustomer)) {
-            return $mercadoPagoCustomer;
-        }
+        // if (is_wp_error($mercadoPagoCustomer)) {
+        //     return $mercadoPagoCustomer;
+        // }
 
-        // create card token if not exists
-        $cardToken = $this->getOrCreateCard($fcCustomer, $mercadoPagoCustomer, $mpFormData);
+        // // create card token if not exists
+        // $cardToken = $this->getOrCreateCard($fcCustomer, $mercadoPagoCustomer, $mpFormData);
 
-        if (is_wp_error($cardToken)) {
-            return $cardToken;
-        }
+        // if (is_wp_error($cardToken)) {
+        //     return $cardToken;
+        // }
 
-        $amount = MercadoPagoHelper::formatAmount($transaction->total, $transaction->currency);
+        // $amount = MercadoPagoHelper::formatAmount($transaction->total, $transaction->currency);
 
-        $paymentData = [
-            'preapproval_plan_id' => Arr::get($plan, 'id'),
-            'external_reference'  => $subscription->uuid,
-            'payer_email'         => Arr::get($mpFormData, 'payer.email', $fcCustomer->email),
-            'back_url'            => Arr::get($paymentArgs, 'success_url'),
-            'card_token_id'       => $cardToken,
-            'status'              => 'pending',
+        // $paymentData = [
+        //     'preapproval_plan_id' => Arr::get($plan, 'id'),
+        //     'external_reference'  => $subscription->uuid,
+        //     'payer_email'         => Arr::get($mpFormData, 'payer.email', $fcCustomer->email),
+        //     'back_url'            => Arr::get($paymentArgs, 'success_url'),
+        //     'card_token_id'       => $cardToken,
+        //     'status'              => 'pending',
             
-        ];
+        // ];
 
 
-        $paymentData = apply_filters('fluent_cart/mercadopago/subscription_payment_args', $paymentData, [
-            'order'        => $order,
-            'transaction'  => $transaction,
-            'subscription' => $subscription
-        ]);
+        // $paymentData = apply_filters('fluent_cart/mercadopago/subscription_payment_args', $paymentData, [
+        //     'order'        => $order,
+        //     'transaction'  => $transaction,
+        //     'subscription' => $subscription
+        // ]);
 
 
-        // create subscription
-        $mpSubscription = MercadoPagoAPI::createMercadoPagoObject('preapproval', $paymentData);
+        // // create subscription
+        // $mpSubscription = MercadoPagoAPI::createMercadoPagoObject('preapproval', $paymentData);
 
-        if (is_wp_error($mpSubscription)) {
-            return $mpSubscription;
-        }
+        // if (is_wp_error($mpSubscription)) {
+        //     return $mpSubscription;
+        // }
 
-        $subscription->update([
-            'vendor_subscription_id' => Arr::get($mpSubscription, 'id'),
-        ]);
+        // $subscription->update([
+        //     'vendor_subscription_id' => Arr::get($mpSubscription, 'id'),
+        // ]);
         
-        return [
-            'status'       => 'success',
-            'nextAction'   => 'mercado_pago',
-            'actionName'   => 'custom',
-            'message'      => __('Please complete your subscription payment', 'mercado-pago-for-fluent-cart'),
-            'data'         => [
-                'payment_data'      => $paymentData,
-                'intent'            => 'subscription',
-                'transaction_hash'  => $transaction->uuid,
-                'amount'            => $amount,
-                'currency'          => $transaction->currency,
-                'plan_id'           => Arr::get($plan, 'id'),
-            ]
-        ];
+        // return [
+        //     'status'       => 'success',
+        //     'nextAction'   => 'mercado_pago',
+        //     'actionName'   => 'custom',
+        //     'message'      => __('Please complete your subscription payment', 'mercado-pago-for-fluent-cart'),
+        //     'data'         => [
+        //         'payment_data'      => $paymentData,
+        //         'intent'            => 'subscription',
+        //         'transaction_hash'  => $transaction->uuid,
+        //         'amount'            => $amount,
+        //         'currency'          => $transaction->currency,
+        //         'plan_id'           => Arr::get($plan, 'id'),
+        //     ]
+        // ];
     }
 
     private function getOrCreateCustomer($fcCustomer, $mpFormData, $billingAddress = [])
@@ -200,78 +279,11 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         return Arr::get($mercadoPagoCard, 'id');
     }   
 
-    public function getOrCreatePreapprovalPlan(PaymentInstance $paymentInstance, $paymentArgs = [])
+    public function getOrCreatePreApprovalPlan(PaymentInstance $paymentInstance, $planData = [])
     {
+
         $subscription = $paymentInstance->subscription;
         $order = $paymentInstance->order;
-        $transaction = $paymentInstance->transaction;
-
-
-        $existingPlanId = $subscription->vendor_plan_id;
-        
-        if ($existingPlanId) {
-            $plan = MercadoPagoAPI::getMercadoPagoObject('preapproval_plan/' . $existingPlanId);
-            
-            if (!is_wp_error($plan) && Arr::get($plan, 'id')) {
-                return $plan;
-            }
-        }
-
-        
-        // Map FluentCart interval to Mercado Pago frequency
-        $frequency = $this->mapIntervalFrequency($subscription->billing_interval);
-        $frequencyType = $this->mapIntervalType($subscription->billing_interval);
-
-        $billingPeriod = apply_filters('fluent_cart/mercadopago/subscription_billing_period', [
-            'interval_unit' => $frequencyType,
-            'interval_frequency' => $frequency,
-        ], [
-            'subscription_interval' => $subscription->billing_interval,
-            'payment_method' => 'mercado_pago',
-        ]);
-
-        $autoRecurringData = [
-            'frequency'           => Arr::get($billingPeriod, 'interval_frequency'),
-            'frequency_type'      => Arr::get($billingPeriod, 'interval_unit'),
-            'transaction_amount'  => MercadoPagoHelper::formatAmount($subscription->recurring_total, $transaction->currency),
-            'currency_id'         => strtoupper($transaction->currency),
-        ];
-
-        $billTimes = $subscription->billing_times;
-        if ($billTimes && $billTimes > 0) {
-            $autoRecurringData['repetitions'] = $billTimes;
-        }
-
-        $billingDay = (new MercadoPagoSettingsBase())->getBillingDay();
-
-        if ($billingDay && $billingDay > 0 && $billingDay <=28) {
-            $autoRecurringData['billing_day'] = $billingDay;
-        }
-
-        // trialing data
-        $trialDays = $subscription->trial_days;
-        if ($trialDays && $trialDays > 0) {
-            $autoRecurringData['free_trial'] = [
-                'frequency'      => (int) $trialDays,
-                'frequency_type' => 'days',
-            ];
-        }
-
-        $planData = [
-            'reason'              => $this->getPlanName($order) ?: $subscription->item_name,
-            'auto_recurring'      => $autoRecurringData,
-            'external_reference'  => $subscription->uuid,
-            'back_url'            => $transaction->getReceiptPageUrl(),
-        ];
-
-
-        if ($subscription->trial_days && $subscription->trial_days > 0) {
-            $planData['auto_recurring']['free_trial'] = [
-                'frequency'      => (int) $subscription->trial_days,
-                'frequency_type' => 'days',
-            ];
-        }
-
         $planData = apply_filters('fluent_cart/mercadopago/preapproval_plan_args', $planData, [
             'subscription' => $subscription,
             'order'        => $order
@@ -325,32 +337,49 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
 
     public function reSyncSubscriptionFromRemote(Subscription $subscriptionModel)
     {
-        $subscription = $subscriptionModel->subscription;
         $order = $subscriptionModel->order;
-        $transaction = $subscriptionModel->transaction;
-        $fcCustomer = $subscriptionModel->order->customer;
+
+        if (!$order) {
+            return $subscriptionModel;
+        }
+
+        $vendorSubscriptionId = $subscriptionModel->vendor_subscription_id;
+
+        if (empty($vendorSubscriptionId)) {
+            return $subscriptionModel;
+        }
 
         // Get subscription details from Mercado Pago
-        $subscriptionDetails = MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $subscriptionModel->vendor_subscription_id);
+        $subscriptionDetails = MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $vendorSubscriptionId);
+
+        if (is_wp_error($subscriptionDetails)) {
+            return $subscriptionModel;
+        }
 
         $subscriptionTransactions = [];
-
-        $hasMore = false;
-        $next = null;
+        $queryParams = [];
 
         do {
-            $transactions = MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $subscriptionModel->vendor_subscription_id . '/transactions', []);
-            if (is_wp_error($transactions)) {
+            $transactionsResponse = MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $vendorSubscriptionId . '/transactions', $queryParams);
+            
+            if (is_wp_error($transactionsResponse)) {
                 break;
             }
-            $subscriptionTransactions = [...$subscriptionTransactions, ...Arr::get($transactions, 'data', [])];
+            
+            $subscriptionTransactions = array_merge($subscriptionTransactions, Arr::get($transactionsResponse, 'data', []));
 
-            $hasMore = Arr::get($transactions, 'meta.pagination.has_more');
-            $next = Arr::get($transactions, 'meta.pagination.next');
-            $queryString = wp_parse_url($next, PHP_URL_QUERY);
-            wp_parse_str($queryString, $params);
-            $after = $params['after'];
-            $queryParams['after'] = $after;
+            $hasMore = Arr::get($transactionsResponse, 'meta.pagination.has_more', false);
+            
+            if ($hasMore) {
+                $next = Arr::get($transactionsResponse, 'meta.pagination.next');
+                if ($next) {
+                    $queryString = wp_parse_url($next, PHP_URL_QUERY);
+                    wp_parse_str($queryString, $params);
+                    $queryParams['after'] = $params['after'] ?? null;
+                } else {
+                    $hasMore = false;
+                }
+            }
         } while ($hasMore);
 
         $subscriptionUpdateData = MercadoPagoHelper::getSubscriptionUpdateData($subscriptionDetails, $subscriptionModel);
@@ -358,51 +387,66 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         $newPayment = false;
 
         if (!empty($subscriptionTransactions)) {
+
             $subscriptionTransactions = array_reverse($subscriptionTransactions);
-            foreach ($subscriptionTransactions as $transaction) {
-                $amount = Arr::get($transaction, 'amount');
-                $vendorChargeId = Arr::get($transaction, 'id');
-                $status = Arr::get($transaction, 'status');
+            
+            foreach ($subscriptionTransactions as $mpTransaction) {
+                $amount = Arr::get($mpTransaction, 'amount');
+                $vendorChargeId = Arr::get($mpTransaction, 'id');
+                $mpStatus = Arr::get($mpTransaction, 'status');
                 
-                $transactionModel = null;
-                $transactionModel = OrderTransaction::query()->where('vendor_charge_id', $vendorChargeId)->first();
-
-                 if ($transactionModel) {
-                     continue;
-                 }
-
-                 if (!$transactionModel) {
-                     $transactionModel = OrderTransaction::query()->where('vendor_charge_id', '')->where('status', Status::TRANSACTION_PENDING)->first();
-
-                    if ($transactionModel) {
-                        $transactionModel->update([
-                            'vendor_charge_id' => $vendorChargeId,
-                            'status' => Status::TRANSACTION_SUCCEEDED,
-                        ]);
-                        continue;
-                    }
-
-                    // record renewal payment
-                    $transactionData = [
-                        'order_id' => $order->id,
-                        'subscription_id' => $subscriptionModel->id,
-                        'vendor_charge_id' => $vendorChargeId,
-                        'status' => Status::TRANSACTION_SUCCEEDED,
-                        'total' => $amount,
-                        'meta' => [
-                            'mercado_pago_transaction' => Arr::get($transaction, 'transaction_details', []),
-                        ],
-                    ];
-                    SubscriptionService::recordRenewalPayment($transactionData, $subscriptionModel, $subscriptionUpdateData);
-                    $newPayment = true;
+                if (!in_array($mpStatus, ['approved', 'processed'])) {
+                    continue;
                 }
 
+                $existingTransaction = OrderTransaction::query()
+                    ->where('vendor_charge_id', $vendorChargeId)
+                    ->first();
+
+                if ($existingTransaction) {
+                    continue;
+                }
+
+                $pendingTransaction = OrderTransaction::query()
+                    ->where('subscription_id', $subscriptionModel->id)
+                    ->where('status', Status::TRANSACTION_PENDING)
+                    ->where(function($query) {
+                        $query->whereNull('vendor_charge_id')
+                              ->orWhere('vendor_charge_id', '');
+                    })
+                    ->first();
+
+                if ($pendingTransaction) {
+                    $pendingTransaction->update([
+                        'vendor_charge_id' => $vendorChargeId,
+                        'status'           => Status::TRANSACTION_SUCCEEDED,
+                        'total'            => \FluentCart\App\Helpers\Helper::toCent($amount),
+                    ]);
+                    
+                    (new \FluentCart\App\Helpers\StatusHelper($pendingTransaction->order))->syncOrderStatuses($pendingTransaction);
+                    continue;
+                }
+
+                $transactionData = [
+                    'order_id'         => $order->id,
+                    'subscription_id'  => $subscriptionModel->id,
+                    'vendor_charge_id' => $vendorChargeId,
+                    'status'           => Status::TRANSACTION_SUCCEEDED,
+                    'total'            => \FluentCart\App\Helpers\Helper::toCent($amount),
+                    'currency'         => $subscriptionModel->currency ?? $order->currency,
+                    'meta'             => [
+                        'mercado_pago_transaction' => $mpTransaction,
+                    ],
+                ];
+                
+                SubscriptionService::recordRenewalPayment($transactionData, $subscriptionModel, $subscriptionUpdateData);
+                $newPayment = true;
             }
         }
 
         if (!$newPayment) {
             $subscriptionModel = SubscriptionService::syncSubscriptionStates($subscriptionModel, $subscriptionUpdateData);
-        } 
+        }
 
         return $subscriptionModel;
     }
@@ -412,41 +456,58 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
         $order = $subscription->order;
 
         if (!$order) {
-            return;
+            return $subscription;
+        }
+
+        if (empty($vendorSubscriptionId)) {
+            $vendorSubscriptionId = $subscription->vendor_subscription_id;
+        }
+
+        if (empty($vendorSubscriptionId)) {
+            return $subscription;
         }
 
         $response = MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $vendorSubscriptionId);
 
         if (is_wp_error($response)) {
-            return;
+            return $subscription;
         }
 
-        $nextBillingDate = Arr::get($response, 'next_payment_date') ?? null;
-
+        $nextBillingDate = Arr::get($response, 'next_payment_date');
         if ($nextBillingDate) {
-            $nextBillingDate = DateTime::anyTimeToGmt($nextBillingDate)->format('Y-m-d');
+            $nextBillingDate = DateTime::anyTimeToGmt($nextBillingDate)->format('Y-m-d H:i:s');
         }
 
         $status = MercadoPagoHelper::mapSubscriptionStatus(Arr::get($response, 'status'));
-        $billCount = OrderTransaction::query()->where('subscription_id', $subscription->id)->count();
+        $billCount = OrderTransaction::query()
+            ->where('subscription_id', $subscription->id)
+            ->where('transaction_type', Status::TRANSACTION_TYPE_CHARGE)
+            ->where('status', Status::TRANSACTION_SUCCEEDED)
+            ->count();
 
         $oldStatus = $subscription->status;
 
         if (Arr::get($response, 'id')) {
-            $subscription->next_billing_date = $nextBillingDate;
-            $subscription->status = $status;
-            $subscription->vendor_customer_id = Arr::get($response, 'payer_id');
-            $subscription->current_payment_method = 'mercado_pago';
-            $subscription->vendor_subscription_id = Arr::get($response, 'id');
-            $subscription->bill_count = $billCount;
-            $subscription->save();
+            $updateData = [
+                'status'                 => $status,
+                'vendor_customer_id'     => Arr::get($response, 'payer_id'),
+                'current_payment_method' => 'mercado_pago',
+                'vendor_subscription_id' => Arr::get($response, 'id'),
+                'bill_count'             => $billCount,
+            ];
+
+            if ($nextBillingDate) {
+                $updateData['next_billing_date'] = $nextBillingDate;
+            }
+
+            $subscription->update($updateData);
         }
 
-        if ($billingInfo) {
+        if (!empty($billingInfo)) {
             $subscription->updateMeta('active_payment_method', $billingInfo);
         }
 
-        if ($oldStatus != $subscription->status && (Status::SUBSCRIPTION_ACTIVE === $subscription->status || Status::SUBSCRIPTION_TRIALING === $subscription->status)) {
+        if ($oldStatus !== $subscription->status && in_array($subscription->status, [Status::SUBSCRIPTION_ACTIVE, Status::SUBSCRIPTION_TRIALING])) {
             (new SubscriptionActivated($subscription, $order, $order->customer))->dispatch();
         }
 

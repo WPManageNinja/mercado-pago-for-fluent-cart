@@ -54,16 +54,37 @@ class MercadoPagoConfirmations
             ->where('uuid', $transactionHash)
             ->where('payment_method', 'mercado_pago')
             ->first();
+
+        if (!$transaction) {
+            return;
+        }
     
         if ($transaction->status === Status::TRANSACTION_SUCCEEDED) {
             return;
         }
 
         if ($transaction->subscription_id) {
+            // Handle subscription confirmation on return
             $this->confirmMercadoPagoSubscriptionOrder($transaction);
         } else {
+            // Handle one-time payment confirmation on return
+            if (empty($transaction->vendor_charge_id)) {
+                // No payment ID stored yet - can't confirm
+                return;
+            }
+
+            $payment = MercadoPagoAPI::getMercadoPagoObject('v1/payments/' . $transaction->vendor_charge_id);
             
-            $payment = \MercadoPagoFluentCart\API\MercadoPagoAPI::getMercadoPagoObject('v1/payments/' . $transaction->vendor_charge_id);
+            if (is_wp_error($payment)) {
+                return;
+            }
+
+            $paymentStatus = Arr::get($payment, 'status');
+            
+            if (!in_array($paymentStatus, ['approved', 'authorized'])) {
+                return;
+            }
+
             $billingInfo = [
                 'type'                => Arr::get($payment, 'payment_type_id', 'card'),
                 'last4'               => Arr::get($payment, 'card.last_four_digits'),
@@ -71,13 +92,13 @@ class MercadoPagoConfirmations
                 'payment_method_id'   => Arr::get($payment, 'payment_method_id'),
                 'payment_method_type' => Arr::get($payment, 'payment_type_id'),
             ];
+            
             $this->confirmPaymentSuccessByCharge($transaction, [
                 'vendor_charge_id' => $transaction->vendor_charge_id,
                 'charge'           => $payment,
                 'billing_info'     => $billingInfo
             ]);
         }
-
     }
 
     public function confirmMercadoPagoSubscriptionOrder(OrderTransaction $transaction)
@@ -86,96 +107,178 @@ class MercadoPagoConfirmations
             return;
         }
 
-        if (empty($transaction->vendor_subscription_id)) {
-            return;
-        }
-
         $subscriptionModel = Subscription::query()
             ->where('id', $transaction->subscription_id)
             ->first();
-        
-        $subscriptionPlanId = $subscriptionModel->getMeta('vendor_plan_id', false);
 
-        if (!$subscriptionPlanId) {
+        if (!$subscriptionModel) {
             return;
         }
 
-        // search subscription with vendor plan id , in mercado pago
-        $mercadoPagoSUbscriptions = \MercadoPagoFluentCart\API\MercadoPagoAPI::getMercadoPagoObject('preapproval/search', [
-            'preapproval_plan_id' => $subscriptionPlanId
+        // First, try to find subscription by vendor_plan_id (preapproval_plan_id)
+        $vendorPlanId = $subscriptionModel->vendor_plan_id;
+
+        if (!$vendorPlanId) {
+            // Fallback to meta if not in main field
+            $vendorPlanId = $subscriptionModel->getMeta('vendor_plan_id', false);
+        }
+
+        if (!$vendorPlanId) {
+            return;
+        }
+
+        // Search for subscriptions created from this plan in Mercado Pago
+        $mercadoPagoSearchResult = MercadoPagoAPI::getMercadoPagoObject('preapproval/search', [
+            'preapproval_plan_id' => $vendorPlanId
         ]);
 
-        if (is_wp_error($mercadoPagoSUbscriptions)) {
+        if (is_wp_error($mercadoPagoSearchResult)) {
             return;
         }
 
-        $mercadoPagoSubscriptions = Arr::get($mercadoPagoSUbscriptions, 'results');
+        $mercadoPagoSubscriptions = Arr::get($mercadoPagoSearchResult, 'results', []);
 
-        // now filter out the subscription whose external reference is the same as the subscription model uuid
-        $mercadoPagoSubscription = array_filter($mercadoPagoSubscriptions, function($subscription) use ($subscriptionModel) {
-            return $subscription->external_reference === $subscriptionModel->uuid;
-        });
-
-        if (empty($mercadoPagoSubscription)) {
+        if (empty($mercadoPagoSubscriptions)) {
             return;
         }
 
-        $subscriptionData = [
-            'vendor_subscription_id' => $mercadoPagoSubscription->id,
+        // Find the subscription whose external_reference matches our subscription uuid
+        $mercadoPagoSubscription = null;
+        foreach ($mercadoPagoSubscriptions as $mpSub) {
+            if (Arr::get($mpSub, 'external_reference') === $subscriptionModel->uuid) {
+                $mercadoPagoSubscription = $mpSub;
+                break;
+            }
+        }
+
+        if (!$mercadoPagoSubscription) {
+            return;
+        }
+
+        $vendorSubscriptionId = Arr::get($mercadoPagoSubscription, 'id');
+        $mercadoPagoStatus = Arr::get($mercadoPagoSubscription, 'status');
+
+        // Update subscription with vendor subscription ID
+        $subscriptionUpdateData = [
+            'vendor_subscription_id' => $vendorSubscriptionId,
+            'vendor_customer_id'     => Arr::get($mercadoPagoSubscription, 'payer_id'),
+            'status'                 => \MercadoPagoFluentCart\MercadoPagoHelper::getFctSubscriptionStatus($mercadoPagoStatus),
+            'current_payment_method' => 'mercado_pago',
         ];
 
-        // get card info
-        $cardId = $mercadoPagoSubscription->card_id;
-        $billingInfo = [];
-        $card = \MercadoPagoFluentCart\API\MercadoPagoAPI::getMercadoPagoObject('v1/customers/' . $mercadoPagoSubscription->payer_id . '/cards/' . $cardId);
-
-        if (!is_wp_error($card)) {
-            $billingInfo = [
-                'type' => 'card',
-                'last4' => Arr::get($card, 'last_four_digits'),
-                'brand' => Arr::get($card, 'payment_method.name'),
-                'payment_type_id' => Arr::get($card, 'payment_method.payment_type_id'),
-                'expiration_month' => Arr::get($card, 'expiration_month'),
-                'expiration_year' => Arr::get($card, 'expiration_year'),
-                'card_id' => Arr::get($card, 'id'),
-            ];
+        // Update next billing date if available
+        $nextPaymentDate = Arr::get($mercadoPagoSubscription, 'next_payment_date');
+        if ($nextPaymentDate) {
+            $subscriptionUpdateData['next_billing_date'] = DateTime::anyTimeToGmt($nextPaymentDate)->format('Y-m-d H:i:s');
         }
 
-        $subscriptionModel->updateMeta('active_payment_method', $billingInfo);
+        $subscriptionModel->update($subscriptionUpdateData);
 
-        // search invoice from mercado pago
-        $invoices = \MercadoPagoFluentCart\API\MercadoPagoAPI::getMercadoPagoObject('v1/invoices/search', [
-            'preapproval_id' => $mercadoPagoSubscription->id,
+        // Get card info if available
+        $cardId = Arr::get($mercadoPagoSubscription, 'card_id');
+        $payerId = Arr::get($mercadoPagoSubscription, 'payer_id');
+        $billingInfo = [];
+
+        if ($cardId && $payerId) {
+            $card = MercadoPagoAPI::getMercadoPagoObject('v1/customers/' . $payerId . '/cards/' . $cardId);
+
+            if (!is_wp_error($card) && Arr::get($card, 'id')) {
+                $billingInfo = [
+                    'type'             => 'card',
+                    'last4'            => Arr::get($card, 'last_four_digits'),
+                    'brand'            => Arr::get($card, 'payment_method.name'),
+                    'payment_type_id'  => Arr::get($card, 'payment_method.payment_type_id'),
+                    'expiration_month' => Arr::get($card, 'expiration_month'),
+                    'expiration_year'  => Arr::get($card, 'expiration_year'),
+                    'card_id'          => Arr::get($card, 'id'),
+                ];
+            }
+        }
+
+        if (!empty($billingInfo)) {
+            $subscriptionModel->updateMeta('active_payment_method', $billingInfo);
+        }
+
+        // Check if subscription has trial or signup fee
+        $hasTrial = $subscriptionModel->trial_days && $subscriptionModel->trial_days > 0;
+        $signupFee = (int) $subscriptionModel->signup_fee;
+
+        // Try to find the first authorized payment for this subscription
+        $authorizedPayments = MercadoPagoAPI::getMercadoPagoObject('preapproval/' . $vendorSubscriptionId . '/transactions', [
             'offset' => 0,
-            'limit' => 1,
+            'limit' => 1
         ]);
 
-        if (is_wp_error($invoices)) {
-            $invoices = [];
-        } else {
-            $invoices = Arr::get($invoices, 'results');
+        $paymentId = null;
+        $paymentData = [];
+
+        if (!is_wp_error($authorizedPayments)) {
+            $payments = Arr::get($authorizedPayments, 'data', []);
+            if (!empty($payments)) {
+                $firstPayment = $payments[0];
+                $paymentId = Arr::get($firstPayment, 'id');
+                $paymentStatus = Arr::get($firstPayment, 'status');
+                
+                if (in_array($paymentStatus, ['approved', 'processed'])) {
+                    $paymentData = $firstPayment;
+                }
+            }
         }
 
-        $firstInvoice = Arr::first($invoices);
+        // If we found a payment, use it
+        if ($paymentId && !empty($paymentData)) {
+            $this->confirmPaymentSuccessByCharge($transaction, [
+                'vendor_charge_id'  => $paymentId,
+                'charge'            => [
+                    'transaction_amount' => Arr::get($paymentData, 'amount', $subscriptionModel->recurring_total / 100),
+                    'currency_id'        => $subscriptionModel->currency,
+                ],
+                'billing_info'      => $billingInfo,
+                'subscription_data' => ['vendor_subscription_id' => $vendorSubscriptionId]
+            ]);
+        } elseif ($hasTrial && in_array($mercadoPagoStatus, ['authorized', 'pending'])) {
+            // Trial subscription - no payment expected yet
+            $updateData = [
+                'status'           => Status::TRANSACTION_SUCCEEDED,
+                'vendor_charge_id' => $vendorSubscriptionId . '_trial_authorized',
+                'meta'             => array_merge($transaction->meta ?? [], [
+                    'trial_authorization' => true,
+                    'mercado_pago_status' => $mercadoPagoStatus,
+                ])
+            ];
 
-        if ($firstInvoice) {
-            $paymentId = $firstInvoice->payment->id;
-
-            $payment = \MercadoPagoFluentCart\API\MercadoPagoAPI::getMercadoPagoObject('v1/payments/' . $paymentId);
-
-            if (!is_wp_error($payment)) {
-                return;
+            // If there's a signup fee that won't be collected, note this and adjust total
+            if ($signupFee > 0) {
+                $updateData['meta']['signup_fee_note'] = sprintf(
+                    'Signup fee of %s was not collected. Mercado Pago preapproval_plan does not support initial fees.',
+                    $signupFee / 100
+                );
+                $updateData['total'] = 0;
+                
+                fluent_cart_add_log(
+                    __('Mercado Pago Signup Fee Not Collected', 'mercado-pago-for-fluent-cart'),
+                    sprintf('Subscription %s has a signup fee of %s that could not be collected via Mercado Pago preapproval_plan.', $subscriptionModel->uuid, $signupFee / 100),
+                    'warning',
+                    ['module_name' => 'subscription', 'module_id' => $subscriptionModel->id]
+                );
             }
 
-            $this->confirmPaymentSuccessByCharge($transaction, [
-                'vendor_charge_id' => $paymentId,
-                'charge'           => $payment,
-                'billing_info'     => $billingInfo,
-                'subscription_data' => $subscriptionData
+            $transaction->update($updateData);
+            (new StatusHelper($transaction->order))->syncOrderStatuses($transaction);
+        } elseif (in_array($mercadoPagoStatus, ['authorized', 'pending'])) {
+            // Non-trial subscription authorized but no payment found yet
+            $transaction->update([
+                'status'           => Status::TRANSACTION_SUCCEEDED,
+                'vendor_charge_id' => $vendorSubscriptionId . '_initial',
+                'meta'             => array_merge($transaction->meta ?? [], [
+                    'mercado_pago_status' => $mercadoPagoStatus,
+                ])
             ]);
+
+            (new StatusHelper($transaction->order))->syncOrderStatuses($transaction);
         }
 
-        return;
+        return $subscriptionModel;
     }
 
 
