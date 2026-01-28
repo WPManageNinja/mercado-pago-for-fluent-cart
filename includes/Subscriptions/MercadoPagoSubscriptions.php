@@ -60,6 +60,12 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
             ];
         }
 
+        return [
+            'status' => 'failed',
+            'message' => __('Failed to create subscription plan', 'mercado-pago-for-fluent-cart'),
+        ];
+
+        // end of the flow, as I am using the plan's init_point and redirecting
 
         $mercadoPagoCustomer = $this->getOrCreateCustomer($fcCustomer, $mpFormData, $billingAddress);
 
