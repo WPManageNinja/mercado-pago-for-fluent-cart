@@ -223,8 +223,7 @@ class MercadoPagoHelper
             'MXN' => 'es-MX',
             'COP' => 'es-CO',
             'PEN' => 'es-PE', 
-            'UYU' => 'es-UY',
-            'USD' => 'en-US',
+            'UYU' => 'es-UY'
         ];
 
         return $localesMap[$currency] ?? determine_locale();
