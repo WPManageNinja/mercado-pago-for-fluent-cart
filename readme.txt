@@ -4,7 +4,7 @@ Tags: mercado pago, payment gateway, fluent cart, ecommerce, payments
 Requires at least: 5.6
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,9 @@ You can process refunds directly from FluentCart. Go to Orders, select the order
 4. Multiple payment methods available
 
 == Changelog ==
+
+= 1.0.1 =
+* Fix: Duplicate confirmation error
 
 = 1.0.0 =
 * Initial release
