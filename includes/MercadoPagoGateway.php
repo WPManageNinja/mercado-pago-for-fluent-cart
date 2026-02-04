@@ -63,7 +63,8 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                 'type' => 'github',
                 'link' => 'https://github.com/WPManageNinja/mercado-pago-for-fluent-cart/releases/latest',
                 'slug' => $this->addonSlug,
-                'file' => $this->addonFile
+                'file' => $this->addonFile,
+                'is_installed' => true,
             ],
             'addon_status' => $addonStatus,
             'supported_features' => $this->supportedFeatures,
