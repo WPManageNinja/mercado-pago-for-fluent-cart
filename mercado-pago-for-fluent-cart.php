@@ -87,7 +87,7 @@ add_action('plugins_loaded', function() {
     /**
      * Plugin Updater
      */
-    $apiUrl = 'https://fluentcart.com/wp-admin/admin-ajax.php?action=fluent_cart_mercado_pago_update&time=' . time();
+    $apiUrl = 'https://api.fluentcart.com/wp-admin/admin-ajax.php?action=fluent_cart_mercado_pago_update&time=' . time();
     new \MercadoPagoFluentCart\PluginManager\Updater($apiUrl, MERCADOPAGO_FCT_PLUGIN_FILE, array(
         'version'   => MERCADOPAGO_FCT_VERSION,
         'license'   => '12345',
