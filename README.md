@@ -26,12 +26,56 @@ Mercado Pago for FluentCart is a payment gateway addon that seamlessly integrate
 
 ## Installation
 
-1. Upload the `mercado-pago-for-fluent-cart` folder to the `/wp-content/plugins/` directory
-2. Activate the plugin through the 'Plugins' menu in WordPress
-3. Go to FluentCart > Settings > Payment Methods
-4. Find "Mercado Pago" and click "Configure"
-5. Enter your Mercado Pago API credentials
-6. Save settings and test your integration
+### Prerequisites
+
+- WordPress 5.6 or higher
+- PHP 7.4 or higher
+- [FluentCart](https://wordpress.org/plugins/fluent-cart/) plugin installed and activated
+- A [Mercado Pago](https://www.mercadopago.com) account
+
+### Install & Activate
+
+1. **Download the Plugin**
+   - Visit the [latest release](../../releases/latest)
+   - Download the `Source code (zip)` file
+
+2. **Upload to WordPress**
+   - Go to your WordPress admin dashboard
+   - Navigate to **Plugins > Add New**
+   - Click **Upload Plugin**
+   - Select the downloaded zip file and click **Install Now**
+
+3. **Activate the Plugin**
+   - After installation, click **Activate Plugin**
+   - Alternatively, go to **Plugins** and click "Activate" below the plugin name
+
+4. **Configure Mercado Pago**
+   - Go to **FluentCart > Settings > Payment Methods**
+   - Find and enable **Mercado Pago**
+   - Enter your Test and Live API credentials from the [Mercado Pago Developer Dashboard](https://www.mercadopago.com/developers/panel/app)
+   - Configure your webhook URL (see [Configuration](#configuration) below)
+
+## Updates
+
+To update the Mercado Pago for FluentCart addon:
+
+1. **Check for Updates**
+   - Go to **FluentCart > Settings > Payment Methods**
+   - Click on the **Mercado Pago** payment method
+   - Click the **Check for Updates** button
+
+2. **Download the New Version**
+   - If a new version is available, an **Update Now** button will appear
+   - Clicking this button will take you to the latest release page
+   - Download the `Source code (zip)` file
+
+3. **Install the Update**
+   - Go to **Plugins > Add New > Upload Plugin**
+   - Upload the new zip file
+   - WordPress will automatically replace the old version with the new one
+   - Reactivate the plugin if prompted
+
+> **Note:** Since this addon is distributed via GitHub releases (not the WordPress Plugin Directory), updates must be installed manually using the steps above.
 
 ## Configuration
 
@@ -169,4 +213,3 @@ This plugin is licensed under the GPLv2 or later.
 
 Developed by FluentCart Team
 Mercado Pago API integration
-
