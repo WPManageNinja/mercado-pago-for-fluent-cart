@@ -1,5 +1,7 @@
 # Mercado Pago for FluentCart
 
+[![Download Latest](https://img.shields.io/badge/Download-Latest-blue?style=for-the-badge&logo=github)](https://github.com/WPManageNinja/mercado-pago-for-fluent-cart/releases/latest/download/mercado-pago-for-fluent-cart.zip)
+
 Accept payments via Mercado Pago in FluentCart with support for one-time payments, subscriptions, and automatic refunds via webhooks.
 
 ## Description
