@@ -3,7 +3,7 @@
  * Plugin Name: Mercado Pago for FluentCart
  * Plugin URI: https://fluentcart.com
  * Description: Accept payments via Mercado Pago in FluentCart - supports one-time payments, subscriptions, and automatic refunds via webhooks.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: FluentCart
  * Author URI: https://fluentcart.com
  * Text Domain: mercado-pago-for-fluent-cart
@@ -19,7 +19,7 @@
 defined('ABSPATH') || exit('Direct access not allowed.');
 
 // Define plugin constants
-define('MERCADOPAGO_FCT_VERSION', '1.0.1');
+define('MERCADOPAGO_FCT_VERSION', '1.0.2');
 define('MERCADOPAGO_FCT_PLUGIN_FILE', __FILE__);
 define('MERCADOPAGO_FCT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MERCADOPAGO_FCT_PLUGIN_URL', plugin_dir_url(__FILE__));
