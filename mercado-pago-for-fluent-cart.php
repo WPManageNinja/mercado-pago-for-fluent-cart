@@ -84,6 +84,39 @@ add_action('plugins_loaded', function() {
         \MercadoPagoFluentCart\MercadoPagoGateway::register();
     }, 10);
 
+    /**
+     * Plugin Updater
+     */
+    $apiUrl = 'https://api.fluentcart.com/wp-admin/admin-ajax.php?action=fluent_cart_mercado_pago_update&time=' . time();
+    new \MercadoPagoFluentCart\PluginManager\Updater($apiUrl, MERCADOPAGO_FCT_PLUGIN_FILE, array(
+        'version'   => MERCADOPAGO_FCT_VERSION,
+        'license'   => '12345',
+        'item_name' => 'Mercado Pago for FluentCart',
+        'item_id'   => '103',
+        'author'    => 'wpmanageninja'
+    ),
+        array(
+            'license_status' => 'valid',
+            'admin_page_url' => admin_url('admin.php?page=fluent-cart#/'),
+            'purchase_url'   => 'https://fluentcart.com',
+            'plugin_title'   => 'Mercado Pago for FluentCart'
+        )
+    );
+
+    add_filter('plugin_row_meta', function ($links, $pluginFile) {
+        if (plugin_basename(MERCADOPAGO_FCT_PLUGIN_FILE) !== $pluginFile) {
+            return $links;
+        }
+
+        $checkUpdateUrl = esc_url(admin_url('plugins.php?mercado-pago-for-fluent-cart-check-update=' . time()));
+
+        $row_meta = array(
+            'check_update' => '<a style="color: #583fad;font-weight: 600;" href="' . $checkUpdateUrl . '" aria-label="' . esc_attr__('Check Update', 'mercado-pago-for-fluent-cart') . '">' . esc_html__('Check Update', 'mercado-pago-for-fluent-cart') . '</a>',
+        );
+
+        return array_merge($links, $row_meta);
+    }, 10, 2);
+
 }, 20);
 
 
