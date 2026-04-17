@@ -30,7 +30,8 @@ class MercadoPagoGateway extends AbstractPaymentGateway
     public array $supportedFeatures = [
         'payment',
         'refund',
-        'webhook'
+        'webhook',
+        'manual_subscription',
     ];
 
     public function __construct()
@@ -83,11 +84,6 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             return $methods;
         });
 
-        // Declare manual subscription support — subscription orders are processed as single payments.
-        add_filter('fluent_cart/payment_methods_supporting_manual_subscriptions', function ($methods) {
-            $methods[] = 'mercado_pago';
-            return $methods;
-        });
     }
 
     public function makePaymentFromPaymentInstance(PaymentInstance $paymentInstance)
