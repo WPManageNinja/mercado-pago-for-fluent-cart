@@ -82,6 +82,12 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             $methods[] = 'mercado_pago';
             return $methods;
         });
+
+        // Declare manual subscription support — subscription orders are processed as single payments.
+        add_filter('fluent_cart/payment_methods_supporting_manual_subscriptions', function ($methods) {
+            $methods[] = 'mercado_pago';
+            return $methods;
+        });
     }
 
     public function makePaymentFromPaymentInstance(PaymentInstance $paymentInstance)
@@ -91,15 +97,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'cancel_url' => $this->getCancelUrl(),
         ];
 
-        if ($paymentInstance->subscription) {
-            // not handling subscriptions for now
-            // return (new Subscriptions\MercadoPagoSubscriptions())->handleSubscription($paymentInstance, $paymentArgs);
-
-            wp_send_json([
-                'status' => 'failed',
-                'message' => __('Subscriptions are not supported for Mercado Pago yet.', 'mercado-pago-for-fluent-cart')
-            ], 422);
-        }
+        $this->maybeConvertToManualSubscription($paymentInstance);
 
         return (new Onetime\MercadoPagoProcessor())->handleSinglePayment($paymentInstance, $paymentArgs);
     }
@@ -142,9 +140,6 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'payer_email' => $cart->customer->email ?? ''
         ];
 
-        if ($hasSubscription) {
-            $paymentDetails['mode'] = 'subscription';
-        }
 
         // wallet support is disabled for now
         // $preference = $this->createPreference($items, $shippingCharge, Arr::get($tax, 'tax_total', 0));
