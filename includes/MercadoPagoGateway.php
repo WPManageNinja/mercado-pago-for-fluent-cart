@@ -342,37 +342,48 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         return site_url('?fluent-cart=fct_payment_listener_ipn&method=mercado_pago');
     }
 
-    public function getWebhookInstructions(): string
+    public function getWebhookInstructions(): array
     {
         $webhook_url = site_url('?fluent-cart=fct_payment_listener_ipn&method=mercado_pago');
         $configureLink = 'https://www.mercadopago.com/developers/panel/app';
 
-        return sprintf(
-            '<div style="line-height: 1.8;">
-                <p><b>%s</b><code class="copyable-content">%s</code></p>
-                <p>%s</p>
-                <ol style="margin-left: 20px;">
-                    <li>%s</li>
-                    <li>%s</li>
-                    <li>%s</li>
-                    <li>%s</li>
-                </ol>
-                <p style="margin-top: 10px;"><b>%s</b> %s</p>
-            </div>',
-            __('Webhook URL:', 'mercado-pago-for-fluent-cart'),
-            esc_html($webhook_url),
-            sprintf(
-                'Configure webhooks in your <a href="%1$s" target="_blank">%2$s</a>:',
-                esc_url($configureLink),
-                'Mercado Pago Developer Dashboard'
-            ),
-            __('Go to Your integrations > Select your application > Webhooks', 'mercado-pago-for-fluent-cart'),
-            __('Enter the webhook URL above in "Production mode URL" or "Test mode URL"', 'mercado-pago-for-fluent-cart'),
-            __('Select these events: <strong>Payments</strong>, <strong>Orders</strong>, and <strong>Plans and Subscriptions</strong>', 'mercado-pago-for-fluent-cart'),
-            __('Click Save - A <strong>secret signature</strong> will be generated', 'mercado-pago-for-fluent-cart'),
-            __('Important:', 'mercado-pago-for-fluent-cart'),
-            __('Copy the generated secret signature and paste it in the "Webhook Secret" field above (for the corresponding mode). This is required to verify webhook authenticity and security.', 'mercado-pago-for-fluent-cart')
+        $svg    = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V11H19L18.9999 6.413L11.2071 14.2071L9.79289 12.7929L17.5849 5H13V3H21Z"></path></svg>';
+
+        /* translators: %1$s: "Mercado Pago Developer Dashboard" link with icon */
+        $step = fn($url) => \sprintf(
+            '<p>%s</p>',
+            \sprintf(
+                __('Click %1$s', 'mercado-pago-for-fluent-cart'),
+                \sprintf('<a href="%s" target="_blank">%s %s</a>', $url, __('Mercado Pago Developer Dashboard', 'mercado-pago-for-fluent-cart'), $svg)
+            )
         );
+
+        return [
+            'title'       => __('Webhook URL', 'mercado-pago-for-fluent-cart'),
+            'webhook_url' => $webhook_url,
+            'description' => __('You should configure your Mercado Pago Developer Dashboard', 'mercado-pago-for-fluent-cart'),
+            'steps'       => [
+                'title' => __('How to configure?', 'mercado-pago-for-fluent-cart'),
+                'list'  => [
+                    __('Go to Your integrations &rarr; Select your application &rarr; Webhooks', 'mercado-pago-for-fluent-cart'),
+                    $step($configureLink),
+                    __('Enter the webhook URL above in "Production mode URL" or "Test mode URL"', 'mercado-pago-for-fluent-cart'),
+                    __('Click Save - A secret signature will be generated', 'mercado-pago-for-fluent-cart'),
+                ],
+            ],
+            'events' => [
+                'title' => __('Select these events', 'mercado-pago-for-fluent-cart'),
+                'list'  => [
+                    'Payments',
+                    'Orders',
+                    'Plans and Subscriptions',
+                ],
+            ],
+            'webhook_notice' => [
+                'title' => __('Important', 'mercado-pago-for-fluent-cart'),
+                'description'  => __(' Copy the generated secret signature and paste it in the "Webhook Secret" field above (for the corresponding mode). This is required to verify webhook authenticity and security.', 'mercado-pago-for-fluent-cart')
+            ]
+        ];
 
     }
 
