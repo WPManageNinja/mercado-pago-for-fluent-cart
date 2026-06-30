@@ -44,6 +44,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
     public function meta(): array
     {
         $logo = MERCADOPAGO_FCT_PLUGIN_URL . 'assets/images/mercado-pago-logo.svg';
+        $logoLight = MERCADOPAGO_FCT_PLUGIN_URL . 'assets/images/mercado-pago-logo-light.svg';
         $addonStatus = PaymentAddonManager::getAddonStatus($this->addonSlug, $this->addonFile);
 
         return [
@@ -54,6 +55,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             'admin_title' => 'Mercado Pago',
             'description' => __('Pay securely with Mercado Pago - Card, Pix, Boleto, and more', 'mercado-pago-for-fluent-cart'),
             'logo' => $logo,
+            'logo_light' => $logoLight,
             'tag' => 'beta',
             'icon' => $logo,
             'brand_color' => '#009EE3',
