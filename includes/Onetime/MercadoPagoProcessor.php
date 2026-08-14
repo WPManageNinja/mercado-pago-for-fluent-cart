@@ -63,7 +63,7 @@ class MercadoPagoProcessor
                 'transaction_hash' => $transaction->uuid,
             ],
             'notification_url' => $this->getWebhookUrl(),
-            'callback_url' => $transaction->getReceiptPageUrl(),
+            'callback_url' => Arr::get($paymentArgs, 'success_url') ?: $transaction->getReceiptPageUrl(),
         ];
 
         if (Arr::get($payerInfo, 'address')) {

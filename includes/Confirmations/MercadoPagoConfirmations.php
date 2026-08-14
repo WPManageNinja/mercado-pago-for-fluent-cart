@@ -81,7 +81,7 @@ class MercadoPagoConfirmations
 
             wp_send_json(
                 [
-                    'redirect_url' => $transactionModel->getReceiptPageUrl(),
+                    'redirect_url' => method_exists($transactionModel, 'getSuccessUrl') ? $transactionModel->getSuccessUrl() : $transactionModel->getReceiptPageUrl(),
                     'order'        => [
                         'uuid' => $transactionModel->order->uuid,
                     ],
@@ -93,7 +93,7 @@ class MercadoPagoConfirmations
         if ($paymentStatus === 'pending') {
             wp_send_json([
                 'status'  => 'pending',
-                'redirect_url' => $transactionModel->getReceiptPageUrl(),
+                'redirect_url' => method_exists($transactionModel, 'getSuccessUrl') ? $transactionModel->getSuccessUrl() : $transactionModel->getReceiptPageUrl(),
                 'message' => __('Payment not approved/authorized yet', 'mercado-pago-for-fluent-cart')
             ], 200);
         }
