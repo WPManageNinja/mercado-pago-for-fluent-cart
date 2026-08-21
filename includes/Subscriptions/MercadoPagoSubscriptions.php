@@ -8,6 +8,7 @@ use FluentCart\App\Modules\PaymentMethods\Core\AbstractSubscriptionModule;
 use FluentCart\App\Services\Payments\PaymentInstance;
 use FluentCart\App\Models\Subscription;
 use FluentCart\App\Modules\Subscriptions\Services\SubscriptionService;
+use FluentCart\App\Services\DateTime\DateTime;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 use MercadoPagoFluentCart\MercadoPagoHelper;
 use FluentCart\Framework\Support\Arr;
@@ -348,9 +349,33 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
                  }
 
                  if (!$transactionModel) {
-                     $transactionModel = OrderTransaction::query()->where('vendor_charge_id', '')->where('status', Status::TRANSACTION_PENDING)->first();
+                    // Mercado Pago's date_approved is when the payment was
+                    // approved; that is the settlement moment, not this
+                    // resync's run time. The preapproval transactions listing
+                    // carries no timestamp, so pull it from the payment itself.
+                    $settledAt = null;
+                    $payment = MercadoPagoAPI::getMercadoPagoObject('v1/payments/' . $vendorChargeId);
+                    if (!is_wp_error($payment)) {
+                        $approvedAt = Arr::get($payment, 'date_approved') ?: Arr::get($payment, 'date_created');
+                        if ($approvedAt) {
+                            $settledAt = DateTime::anyTimeToGmt($approvedAt)->format('Y-m-d H:i:s');
+                        }
+                    }
+
+                    $transactionModel = OrderTransaction::query()
+                        ->where('subscription_id', $subscriptionModel->id)
+                        ->where('payment_method', 'mercado_pago')
+                        ->where('vendor_charge_id', '')
+                        ->where('status', Status::TRANSACTION_PENDING)
+                        ->first();
 
                     if ($transactionModel) {
+                        if ($settledAt && empty($transactionModel->meta['settled_at'])) {
+                            $transactionModel->meta = array_merge($transactionModel->meta ?? [], [
+                                'settled_at' => $settledAt
+                            ]);
+                        }
+
                         $transactionModel->update([
                             'vendor_charge_id' => $vendorChargeId,
                             'status' => Status::TRANSACTION_SUCCEEDED,
@@ -365,9 +390,9 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
                         'vendor_charge_id' => $vendorChargeId,
                         'status' => Status::TRANSACTION_SUCCEEDED,
                         'total' => $amount,
-                        'meta' => [
+                        'meta' => array_merge([
                             'mercado_pago_transaction' => Arr::get($transaction, 'transaction_details', []),
-                        ],
+                        ], $settledAt ? ['settled_at' => $settledAt] : []),
                     ];
                     SubscriptionService::recordRenewalPayment($transactionData, $subscriptionModel, $subscriptionUpdateData);
                     $newPayment = true;

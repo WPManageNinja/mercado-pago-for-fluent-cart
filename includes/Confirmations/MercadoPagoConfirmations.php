@@ -8,6 +8,7 @@ use FluentCart\App\Models\Order;
 use FluentCart\App\Models\OrderTransaction;
 use FluentCart\App\Models\Subscription;
 use FluentCart\App\Modules\Subscriptions\Services\SubscriptionService;
+use FluentCart\App\Services\DateTime\DateTime;
 use FluentCart\Framework\Support\Arr;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
@@ -121,6 +122,17 @@ class MercadoPagoConfirmations
         $amount = Arr::get($transactionData, 'transaction_amount', 0) * 100;
         $currency = strtoupper(Arr::get($transactionData, 'currency_id'));
 
+        $metaData = array_merge($transactionModel->meta ?? [], $billingInfo);
+
+        // Mercado Pago's date_approved is when the payment was approved — a
+        // payment can be created pending and approved later, so it beats the
+        // model hook's fallback now() stamp, which for a delayed webhook would
+        // be the (later) processing time, not the approval time.
+        $approvedAt = Arr::get($transactionData, 'date_approved') ?: Arr::get($transactionData, 'date_created');
+        if ($approvedAt && empty($metaData['settled_at'])) {
+            $metaData['settled_at'] = DateTime::anyTimeToGmt($approvedAt)->format('Y-m-d H:i:s');
+        }
+
         // Update transaction
         $transactionUpdateData = array_filter([
             'order_id'             => $order->id,
@@ -132,7 +144,7 @@ class MercadoPagoConfirmations
             'card_brand'           => Arr::get($billingInfo, 'brand', ''),
             'payment_method_type'  => Arr::get($billingInfo, 'payment_method_type', ''),
             'vendor_charge_id'     => $vendorChargeId,
-            'meta'                 => array_merge($transactionModel->meta ?? [], $billingInfo)
+            'meta'                 => $metaData
         ]);
 
         $transactionModel->fill($transactionUpdateData);
