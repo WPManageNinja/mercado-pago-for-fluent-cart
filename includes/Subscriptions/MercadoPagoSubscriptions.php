@@ -362,7 +362,12 @@ class MercadoPagoSubscriptions extends AbstractSubscriptionModule
                         }
                     }
 
-                    $transactionModel = OrderTransaction::query()->where('vendor_charge_id', '')->where('status', Status::TRANSACTION_PENDING)->first();
+                    $transactionModel = OrderTransaction::query()
+                        ->where('subscription_id', $subscriptionModel->id)
+                        ->where('payment_method', 'mercado_pago')
+                        ->where('vendor_charge_id', '')
+                        ->where('status', Status::TRANSACTION_PENDING)
+                        ->first();
 
                     if ($transactionModel) {
                         if ($settledAt && empty($transactionModel->meta['settled_at'])) {
