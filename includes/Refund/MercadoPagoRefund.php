@@ -2,9 +2,6 @@
 
 namespace MercadoPagoFluentCart\Refund;
 
-use FluentCart\App\Helpers\Status;
-use FluentCart\App\Models\OrderTransaction;
-use FluentCart\App\Services\Payments\PaymentHelper;
 use FluentCart\Framework\Support\Arr;
 use FluentCart\Api\CurrencySettings;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
@@ -131,55 +128,6 @@ class MercadoPagoRefund
         );
 
         return $refundId;
-    }
-
-    public static function createOrUpdateIpnRefund($refundData, $parentTransaction)
-    {
-        $allRefunds = OrderTransaction::query()
-            ->where('order_id', $refundData['order_id'])
-            ->where('transaction_type', Status::TRANSACTION_TYPE_REFUND)
-            ->orderBy('id', 'DESC')
-            ->get();
-
-        if ($allRefunds->isEmpty()) {
-            $createdRefund = OrderTransaction::query()->create($refundData);
-            return $createdRefund instanceof OrderTransaction ? $createdRefund : null;
-        }
-
-        $currentRefundMercadoPagoId = Arr::get($refundData, 'vendor_charge_id', '');
-
-        $existingLocalRefund = null;
-        foreach ($allRefunds as $refund) {
-            if ($refund->vendor_charge_id == $refundData['vendor_charge_id']) {
-                if ($refund->total != $refundData['total']) {
-                    $refund->fill($refundData);
-                    $refund->save();
-                }
-
-                return $refund;
-            }
-
-            if (!$refund->vendor_charge_id) { // This is a local refund without vendor charge id
-                $refundMercadoPagoId = Arr::get($refund->meta, 'mercadopago_refund_id', '');
-                $isRefundMatched = $refundMercadoPagoId == $currentRefundMercadoPagoId;
-
-                // This is a local refund without vendor charge id, we will update it
-                if ($refund->total == $refundData['total'] && $isRefundMatched) {
-                    $existingLocalRefund = $refund;
-                }
-            }
-        }
-
-        if ($existingLocalRefund) {
-            $existingLocalRefund->fill($refundData);
-            $existingLocalRefund->save();
-            return $existingLocalRefund;
-        }
-
-        $createdRefund = OrderTransaction::query()->create($refundData);
-        PaymentHelper::updateTransactionRefundedTotal($parentTransaction, $createdRefund->total);
-
-        return $createdRefund;
     }
 
 }
