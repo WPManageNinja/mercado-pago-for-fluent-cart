@@ -7,14 +7,13 @@ use FluentCart\App\Models\Order;
 use FluentCart\App\Models\OrderTransaction;
 use FluentCart\App\Models\Subscription;
 use FluentCart\Framework\Support\Arr;
-use FluentCart\App\Events\Order\OrderRefund;
+use FluentCart\App\Services\Payments\Refund;
 use FluentCart\App\Events\Order\OrderPaymentFailed;
 use FluentCart\App\Events\Subscription\SubscriptionActivated;
 use FluentCart\App\Services\DateTime\DateTime;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 use MercadoPagoFluentCart\Confirmations\MercadoPagoConfirmations;
 use MercadoPagoFluentCart\MercadoPagoHelper;
-use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -463,7 +462,7 @@ class MercadoPagoWebhook
             $this->sendResponse(404, 'Parent transaction not found, skipping refund processing.');
         }
         
-        $currentCreatedRefund = null;
+        $hasNewRefund = false;
         
         // Process each refund (Mercado Pago can have multiple refunds for one payment)
         foreach ($refunds as $refund) {
@@ -499,16 +498,14 @@ class MercadoPagoWebhook
                 ]
             ];
             
-            $syncedRefund = MercadoPagoRefund::createOrUpdateIpnRefund($refundData, $parentTransaction);
+            $recordedRefund = Refund::createOrRecordRefund($refundData, $parentTransaction);
             
-            if ($syncedRefund && $syncedRefund->wasRecentlyCreated) {
-                $currentCreatedRefund = $syncedRefund;
+            if ($recordedRefund instanceof OrderTransaction && $recordedRefund->wasRecentlyCreated) {
+                $hasNewRefund = true;
             }
         }
         
-        if ($currentCreatedRefund) {
-            (new OrderRefund($order, $currentCreatedRefund))->dispatch();
-            
+        if ($hasNewRefund) {
             fluent_cart_add_log(__('Mercado Pago Refund Processed', 'mercado-pago-for-fluent-cart'), 'Refund received from Mercado Pago webhook for payment ID: ' . Arr::get($mercadoPagoPayment, 'id'), 'info', [
                 'module_name' => 'order',
                 'module_id'   => $order->id
