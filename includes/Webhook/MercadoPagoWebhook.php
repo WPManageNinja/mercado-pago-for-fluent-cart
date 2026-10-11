@@ -499,7 +499,11 @@ class MercadoPagoWebhook
             ];
             
             $recordedRefund = Refund::createOrRecordRefund($refundData, $parentTransaction);
-            
+
+            if (is_wp_error($recordedRefund) && $recordedRefund->get_error_code() === 'refund_lock_timeout') {
+                $this->sendResponse(503, $recordedRefund->get_error_message());
+            }
+
             if ($recordedRefund instanceof OrderTransaction && $recordedRefund->wasRecentlyCreated) {
                 $hasNewRefund = true;
             }
