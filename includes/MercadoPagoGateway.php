@@ -100,6 +100,11 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         return (new Onetime\MercadoPagoProcessor())->handleSinglePayment($paymentInstance, $paymentArgs);
     }
 
+    public function isCurrencySupported(): bool
+    {
+        return in_array(strtoupper((string) CurrencySettings::get('currency')), MercadoPagoHelper::getSupportedCurrencies(), true);
+    }
+
     public function getOrderInfo($data)
     {
         MercadoPagoHelper::checkCurrencySupport(CurrencySettings::get('currency'));

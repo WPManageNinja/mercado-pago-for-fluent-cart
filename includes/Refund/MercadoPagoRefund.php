@@ -6,7 +6,6 @@ use FluentCart\App\Helpers\Status;
 use FluentCart\App\Models\OrderTransaction;
 use FluentCart\App\Services\Payments\PaymentHelper;
 use FluentCart\Framework\Support\Arr;
-use FluentCart\Api\CurrencySettings;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 use MercadoPagoFluentCart\MercadoPagoHelper;
 
@@ -58,7 +57,7 @@ class MercadoPagoRefund
             );
         }
 
-        $currency = $transaction->currency ?: CurrencySettings::get('currency');
+        $currency = $transaction->currency ?: $transaction->order->currency;
         $formattedAmount = MercadoPagoHelper::formatAmount($amount, $currency);
 
         $totalPaid = (float) Arr::get($payment, 'transaction_amount', 0);
