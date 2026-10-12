@@ -6,6 +6,7 @@ use FluentCart\App\Helpers\Status;
 use FluentCart\App\Models\Order;
 use FluentCart\App\Models\OrderTransaction;
 use FluentCart\Api\CurrencySettings;
+use FluentCart\Api\StoreSettings;
 use FluentCart\App\Services\DateTime\DateTime;
 use FluentCart\Framework\Support\Arr;
 
@@ -31,6 +32,14 @@ class MercadoPagoHelper
         return true;
     }
 
+
+    // Mercado Pago charges in the account's country currency, which is the store currency
+    public static function isStoreCurrency($currency)
+    {
+        $storeCurrency = (new StoreSettings())->get('currency', 'USD');
+
+        return strtoupper((string) $currency) === strtoupper((string) $storeCurrency);
+    }
 
     public static function getSupportedCurrencies()
     {

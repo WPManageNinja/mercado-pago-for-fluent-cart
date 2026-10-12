@@ -100,6 +100,27 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         return (new Onetime\MercadoPagoProcessor())->handleSinglePayment($paymentInstance, $paymentArgs);
     }
 
+    public function isCurrencySupported(): bool
+    {
+        $currency = strtoupper((string) CurrencySettings::get('currency'));
+
+        return MercadoPagoHelper::isStoreCurrency($currency)
+            && in_array($currency, MercadoPagoHelper::getSupportedCurrencies(), true);
+    }
+
+    public function validatePaymentMethod($data)
+    {
+        $status = parent::validatePaymentMethod($data);
+        if (!Arr::get($status, 'isValid') || $this->isCurrencySupported()) {
+            return $status;
+        }
+
+        return [
+            'isValid' => false,
+            'reason'  => __('Mercado Pago is not available for this currency. Please choose another payment method.', 'mercado-pago-for-fluent-cart'),
+        ];
+    }
+
     public function getOrderInfo($data)
     {
         MercadoPagoHelper::checkCurrencySupport(CurrencySettings::get('currency'));

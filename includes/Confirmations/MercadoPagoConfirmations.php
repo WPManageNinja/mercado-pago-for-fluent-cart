@@ -120,7 +120,20 @@ class MercadoPagoConfirmations
         }
 
         $amount = Arr::get($transactionData, 'transaction_amount', 0) * 100;
-        $currency = strtoupper(Arr::get($transactionData, 'currency_id'));
+        $currency = strtoupper((string) Arr::get($transactionData, 'currency_id'));
+
+        if ($currency && $currency !== strtoupper((string) $order->currency)) {
+            fluent_cart_add_log(__('Mercado Pago Currency Mismatch', 'mercado-pago-for-fluent-cart'), sprintf(
+                /* translators: 1: currency charged by Mercado Pago, 2: order currency, 3: Mercado Pago payment ID */
+                __('Mercado Pago charged in %1$s but the order is in %2$s. Payment ID: %3$s', 'mercado-pago-for-fluent-cart'),
+                $currency,
+                $order->currency,
+                $vendorChargeId
+            ), 'warning', [
+                'module_name' => 'order',
+                'module_id'   => $order->id,
+            ]);
+        }
 
         $metaData = array_merge($transactionModel->meta ?? [], $billingInfo);
 
@@ -137,7 +150,6 @@ class MercadoPagoConfirmations
         $transactionUpdateData = array_filter([
             'order_id'             => $order->id,
             'total'                => $amount,
-            'currency'             => $currency,
             'status'               => Status::TRANSACTION_SUCCEEDED,
             'payment_method'       => 'mercado_pago',
             'card_last_4'          => Arr::get($billingInfo, 'last4', ''),
