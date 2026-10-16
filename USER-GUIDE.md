@@ -8,7 +8,7 @@ Accept payments in Latin America using Mercado Pago with FluentCart. Support for
 
 Before installing Mercado Pago for FluentCart, ensure you have:
 
-- **FluentCart**: Version 1.2.5 or higher (must be installed and active)
+- **FluentCart**: Version 2.2.0 or higher (must be installed and active)
 - **WordPress**: Version 5.6 or higher
 - **PHP**: Version 7.4 or higher
 - **Supported Currency**: Your store must use one of these currencies:
@@ -36,7 +36,7 @@ The Mercado Pago addon can be installed directly from FluentCart:
 5. The addon will be automatically downloaded and installed
 6. Once installation is complete, toggle the **Payment Activation** switch to enable it
 
-> **Note**: The plugin requires FluentCart version 1.2.5 or higher to function properly.
+> **Note**: The plugin requires FluentCart version 2.2.0 or higher to function properly.
 
 ---
 
@@ -238,7 +238,7 @@ The refund will be processed in Mercado Pago, and the customer will receive thei
 
 ### "FluentCart Required" Error
 - Ensure FluentCart is installed and activated
-- Check that FluentCart version is 1.2.5 or higher
+- Check that FluentCart version is 2.2.0 or higher
 
 ### "Currency Not Supported" Error
 - Verify your store currency is one of the supported currencies (see Prerequisites)
