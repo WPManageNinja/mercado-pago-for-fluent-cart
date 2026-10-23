@@ -7,14 +7,13 @@ use FluentCart\App\Models\Order;
 use FluentCart\App\Models\OrderTransaction;
 use FluentCart\App\Models\Subscription;
 use FluentCart\Framework\Support\Arr;
-use FluentCart\App\Events\Order\OrderRefund;
+use FluentCart\App\Services\Payments\Refund;
 use FluentCart\App\Events\Order\OrderPaymentFailed;
 use FluentCart\App\Events\Subscription\SubscriptionActivated;
 use FluentCart\App\Services\DateTime\DateTime;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 use MercadoPagoFluentCart\Confirmations\MercadoPagoConfirmations;
 use MercadoPagoFluentCart\MercadoPagoHelper;
-use MercadoPagoFluentCart\Refund\MercadoPagoRefund;
 use MercadoPagoFluentCart\API\MercadoPagoAPI;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -318,7 +317,9 @@ class MercadoPagoWebhook
             $this->sendResponse(404, 'Transaction not found for the provided reference.');
         }
 
+        // A partial refund leaves the payment approved (status_detail partially_refunded).
         if ($transactionModel->status == Status::TRANSACTION_SUCCEEDED && $paymentStatus == 'approved') {
+            $this->recordRemoteRefunds($mercadoPagoPayment, Arr::get($data, 'order'), $transactionModel);
             $this->sendResponse(200, 'Payment already confirmed.');
         }
 
@@ -336,6 +337,8 @@ class MercadoPagoWebhook
             'charge'           => $mercadoPagoPayment,
             'billing_info'     => $billingInfo
         ]);
+
+        $this->recordRemoteRefunds($mercadoPagoPayment, Arr::get($data, 'order'), $transactionModel);
 
         $this->sendResponse(200, 'Payment confirmed successfully');
 
@@ -462,8 +465,16 @@ class MercadoPagoWebhook
         if (!$parentTransaction) {
             $this->sendResponse(404, 'Parent transaction not found, skipping refund processing.');
         }
-        
-        $currentCreatedRefund = null;
+
+        $this->recordRemoteRefunds($mercadoPagoPayment, $order, $parentTransaction);
+
+        $this->sendResponse(200, 'Refund processed successfully');
+    }
+
+    private function recordRemoteRefunds($mercadoPagoPayment, $order, OrderTransaction $parentTransaction)
+    {
+        $refunds = Arr::get($mercadoPagoPayment, 'refunds', []);
+        $hasNewRefund = false;
         
         // Process each refund (Mercado Pago can have multiple refunds for one payment)
         foreach ($refunds as $refund) {
@@ -499,23 +510,23 @@ class MercadoPagoWebhook
                 ]
             ];
             
-            $syncedRefund = MercadoPagoRefund::createOrUpdateIpnRefund($refundData, $parentTransaction);
-            
-            if ($syncedRefund && $syncedRefund->wasRecentlyCreated) {
-                $currentCreatedRefund = $syncedRefund;
+            $recordedRefund = Refund::createOrRecordRefund($refundData, $parentTransaction);
+
+            if (is_wp_error($recordedRefund) && $recordedRefund->get_error_code() === 'refund_lock_timeout') {
+                $this->sendResponse(503, $recordedRefund->get_error_message());
+            }
+
+            if ($recordedRefund instanceof OrderTransaction && $recordedRefund->wasRecentlyCreated) {
+                $hasNewRefund = true;
             }
         }
         
-        if ($currentCreatedRefund) {
-            (new OrderRefund($order, $currentCreatedRefund))->dispatch();
-            
+        if ($hasNewRefund) {
             fluent_cart_add_log(__('Mercado Pago Refund Processed', 'mercado-pago-for-fluent-cart'), 'Refund received from Mercado Pago webhook for payment ID: ' . Arr::get($mercadoPagoPayment, 'id'), 'info', [
                 'module_name' => 'order',
                 'module_id'   => $order->id
             ]);
         }
-        
-        $this->sendResponse(200, 'Refund processed successfully');
     }
 
     public function getFluentCartOrder($data, $resource)
