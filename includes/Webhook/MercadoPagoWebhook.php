@@ -317,7 +317,9 @@ class MercadoPagoWebhook
             $this->sendResponse(404, 'Transaction not found for the provided reference.');
         }
 
+        // A partial refund leaves the payment approved (status_detail partially_refunded).
         if ($transactionModel->status == Status::TRANSACTION_SUCCEEDED && $paymentStatus == 'approved') {
+            $this->recordRemoteRefunds($mercadoPagoPayment, Arr::get($data, 'order'), $transactionModel);
             $this->sendResponse(200, 'Payment already confirmed.');
         }
 
@@ -335,6 +337,8 @@ class MercadoPagoWebhook
             'charge'           => $mercadoPagoPayment,
             'billing_info'     => $billingInfo
         ]);
+
+        $this->recordRemoteRefunds($mercadoPagoPayment, Arr::get($data, 'order'), $transactionModel);
 
         $this->sendResponse(200, 'Payment confirmed successfully');
 
@@ -461,7 +465,15 @@ class MercadoPagoWebhook
         if (!$parentTransaction) {
             $this->sendResponse(404, 'Parent transaction not found, skipping refund processing.');
         }
-        
+
+        $this->recordRemoteRefunds($mercadoPagoPayment, $order, $parentTransaction);
+
+        $this->sendResponse(200, 'Refund processed successfully');
+    }
+
+    private function recordRemoteRefunds($mercadoPagoPayment, $order, OrderTransaction $parentTransaction)
+    {
+        $refunds = Arr::get($mercadoPagoPayment, 'refunds', []);
         $hasNewRefund = false;
         
         // Process each refund (Mercado Pago can have multiple refunds for one payment)
@@ -515,8 +527,6 @@ class MercadoPagoWebhook
                 'module_id'   => $order->id
             ]);
         }
-        
-        $this->sendResponse(200, 'Refund processed successfully');
     }
 
     public function getFluentCartOrder($data, $resource)
