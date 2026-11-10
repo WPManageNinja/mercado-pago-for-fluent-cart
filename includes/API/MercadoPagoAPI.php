@@ -23,7 +23,7 @@ class MercadoPagoAPI
     }
 
 
-    private static function request($endpoint, $method = 'GET', $data = [])
+    private static function request($endpoint, $method = 'GET', $data = [], $accessToken = null)
     {
         if (empty($endpoint) || !is_string($endpoint)) {
             return new \WP_Error('invalid_endpoint', 'Invalid API endpoint provided');
@@ -36,7 +36,9 @@ class MercadoPagoAPI
         }
 
         $url = self::$baseUrl . $endpoint;
-        $accessToken = self::getSettings()->getAccessToken();
+        if ($accessToken === null) {
+            $accessToken = self::getSettings()->getAccessToken();
+        }
 
         if (!$accessToken) {
             return new \WP_Error('missing_api_key', 'Mercado Pago Access Token is not configured');
@@ -97,9 +99,9 @@ class MercadoPagoAPI
     }
 
 
-    public static function getMercadoPagoObject($endpoint, $params = [])
+    public static function getMercadoPagoObject($endpoint, $params = [], $accessToken = null)
     {
-        return self::request($endpoint, 'GET', $params);
+        return self::request($endpoint, 'GET', $params, $accessToken);
     }
 
     public static function createMercadoPagoObject($endpoint, $data = [])
