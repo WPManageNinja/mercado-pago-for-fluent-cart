@@ -8,6 +8,8 @@ use FluentCart\App\Models\OrderTransaction;
 use FluentCart\Api\CurrencySettings;
 use FluentCart\App\Services\DateTime\DateTime;
 use FluentCart\Framework\Support\Arr;
+use FluentCart\App\Modules\PaymentMethods\Core\BaseGatewaySettings;
+use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -16,12 +18,24 @@ if (!defined('ABSPATH')) {
 class MercadoPagoHelper
 {
     
+    const SITE_CURRENCIES = [
+        'MLA' => 'ARS',
+        'MLB' => 'BRL',
+        'MLC' => 'CLP',
+        'MCO' => 'COP',
+        'MLM' => 'MXN',
+        'MPE' => 'PEN',
+        'MLU' => 'UYU',
+        'MEC' => 'USD',
+    ];
+
+    private static $accountCurrencies = [];
+
     public static function checkCurrencySupport($currency = '')
     {
-        $supportedCurrencies = self::getSupportedCurrencies();
-        $currentCurrency = strtoupper($currency) ?? CurrencySettings::get('currency');
+        $currentCurrency = strtoupper((string) ($currency ?: CurrencySettings::get('currency')));
 
-        if (!in_array($currentCurrency, $supportedCurrencies)) {
+        if ($currentCurrency !== self::getAccountCurrency()) {
             wp_send_json([
                 'status' => 'failed',
                 'message' => __('Mercado Pago does not support currency', 'mercado-pago-for-fluent-cart') . ' ' . $currentCurrency,
@@ -31,19 +45,52 @@ class MercadoPagoHelper
         return true;
     }
 
-
-    public static function getSupportedCurrencies()
+    /**
+     * Mercado Pago charges in the account's own currency whatever the store sends,
+     * so this is the only currency the gateway can accept.
+     */
+    public static function getAccountCurrency($mode = '')
     {
-        return [
-            'ARS', // Argentina Peso
-            'BRL', // Brazilian Real
-            'CLP', // Chilean Peso
-            'MXN', // Mexican Peso
-            'COP', // Colombian Peso
-            'PEN', // Peruvian Sol
-            'UYU', // Uruguayan Peso
-            'USD', // US Dollar for Ecuador
-        ];
+        $settings = new MercadoPagoSettingsBase();
+        $mode = $mode ?: $settings->getMode();
+        $key = $mode . '_account_currency';
+
+        if (array_key_exists($mode, self::$accountCurrencies)) {
+            return self::$accountCurrencies[$mode];
+        }
+
+        $currency = $settings->get($key);
+        if (!is_string($currency) || !$currency) {
+            $currency = self::fetchAccountCurrency($settings->getAccessToken($mode));
+            if ($currency) {
+                $stored = (array) $settings->getCachedSettings();
+                $stored[$key] = $currency;
+                fluent_cart_update_option($settings->methodHandler, $stored);
+                BaseGatewaySettings::$allSettings[$settings->methodHandler] = $stored;
+            }
+        }
+
+        return self::$accountCurrencies[$mode] = $currency ?: null;
+    }
+
+    public static function fetchAccountCurrency($accessToken)
+    {
+        if (!$accessToken) {
+            return null;
+        }
+
+        $response = wp_remote_get('https://api.mercadopago.com/users/me', [
+            'headers' => ['Authorization' => 'Bearer ' . $accessToken],
+            'timeout' => 10,
+        ]);
+
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            return null;
+        }
+
+        $siteId = Arr::get((array) json_decode(wp_remote_retrieve_body($response), true), 'site_id');
+
+        return Arr::get(self::SITE_CURRENCIES, (string) $siteId);
     }
 
     public static function getFctSubscriptionStatus($mercadoPagoStatus)
