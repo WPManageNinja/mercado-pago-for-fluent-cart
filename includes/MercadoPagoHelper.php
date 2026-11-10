@@ -62,8 +62,9 @@ class MercadoPagoHelper
         $currency = $settings->get($key);
         if (!is_string($currency) || !$currency) {
             $currency = self::fetchAccountCurrency($settings->getAccessToken($mode));
-            if ($currency) {
-                $stored = (array) $settings->getCachedSettings();
+            // The lookup can take seconds; write into the row as it is now, and only for the token we looked up.
+            $stored = (array) fluent_cart_get_option($settings->methodHandler, [], false);
+            if ($currency && Arr::get($stored, $mode . '_access_token') === $settings->get($mode . '_access_token') && !Arr::get($stored, $key)) {
                 $stored[$key] = $currency;
                 fluent_cart_update_option($settings->methodHandler, $stored);
                 BaseGatewaySettings::$allSettings[$settings->methodHandler] = $stored;
