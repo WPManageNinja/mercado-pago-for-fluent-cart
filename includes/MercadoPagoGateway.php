@@ -102,7 +102,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
     public function isCurrencySupported(): bool
     {
-        return in_array(strtoupper((string) CurrencySettings::get('currency')), MercadoPagoHelper::getSupportedCurrencies(), true);
+        return strtoupper((string) CurrencySettings::get('currency')) === MercadoPagoHelper::getAccountCurrency();
     }
 
     public function getOrderInfo($data)
@@ -421,6 +421,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                                 'label' => __('Live Access Token', 'mercado-pago-for-fluent-cart'),
                                 'type' => 'password',
                                 'placeholder' => __('APP_USR-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'mercado-pago-for-fluent-cart'),
+                                'description' => $this->accountCurrencyHelp('live'),
                             ],
                             'live_webhook_secret' => [
                                 'value' => '',
@@ -447,6 +448,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
                                 'label' => __('Test Access Token', 'mercado-pago-for-fluent-cart'),
                                 'type' => 'password',
                                 'placeholder' => __('TEST-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'mercado-pago-for-fluent-cart'),
+                                'description' => $this->accountCurrencyHelp('test'),
                             ],
                             'test_webhook_secret' => [
                                 'value' => '',
@@ -480,6 +482,17 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         ];
     }
 
+    private function accountCurrencyHelp($mode)
+    {
+        $currency = MercadoPagoHelper::getStoredAccountCurrency($mode, $this->settings->getAccessToken($mode));
+        if (!$currency) {
+            return '';
+        }
+
+        /* translators: %1$s: currency code, e.g. BRL */
+        return sprintf(__('Account currency: %1$s. Checkout shows Mercado Pago only when the store currency is %1$s.', 'mercado-pago-for-fluent-cart'), $currency);
+    }
+
     public static function validateSettings($data): array
     {
         return $data;
@@ -494,6 +507,8 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         } else {
             $data['live_access_token'] = Helper::encryptKey($data['live_access_token']);
         }
+
+        MercadoPagoHelper::resolveAccountCurrency($mode, Helper::decryptKey(Arr::get($data, $mode . '_access_token')));
 
         return $data;
     }

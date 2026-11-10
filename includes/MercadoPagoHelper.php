@@ -8,6 +8,7 @@ use FluentCart\App\Models\OrderTransaction;
 use FluentCart\Api\CurrencySettings;
 use FluentCart\App\Services\DateTime\DateTime;
 use FluentCart\Framework\Support\Arr;
+use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -16,12 +17,24 @@ if (!defined('ABSPATH')) {
 class MercadoPagoHelper
 {
     
+    const SITE_CURRENCIES = [
+        'MLA' => 'ARS',
+        'MLB' => 'BRL',
+        'MLC' => 'CLP',
+        'MCO' => 'COP',
+        'MLM' => 'MXN',
+        'MPE' => 'PEN',
+        'MLU' => 'UYU',
+        'MEC' => 'USD',
+    ];
+
+    private static $accountCurrencies = [];
+
     public static function checkCurrencySupport($currency = '')
     {
-        $supportedCurrencies = self::getSupportedCurrencies();
-        $currentCurrency = strtoupper($currency) ?? CurrencySettings::get('currency');
+        $currentCurrency = strtoupper((string) ($currency ?: CurrencySettings::get('currency')));
 
-        if (!in_array($currentCurrency, $supportedCurrencies)) {
+        if ($currentCurrency !== self::getAccountCurrency()) {
             wp_send_json([
                 'status' => 'failed',
                 'message' => __('Mercado Pago does not support currency', 'mercado-pago-for-fluent-cart') . ' ' . $currentCurrency,
@@ -31,19 +44,63 @@ class MercadoPagoHelper
         return true;
     }
 
-
-    public static function getSupportedCurrencies()
+    /**
+     * Mercado Pago charges in the account's own currency whatever the store sends,
+     * so this is the only currency the gateway can accept.
+     */
+    public static function getAccountCurrency($mode = '')
     {
-        return [
-            'ARS', // Argentina Peso
-            'BRL', // Brazilian Real
-            'CLP', // Chilean Peso
-            'MXN', // Mexican Peso
-            'COP', // Colombian Peso
-            'PEN', // Peruvian Sol
-            'UYU', // Uruguayan Peso
-            'USD', // US Dollar for Ecuador
-        ];
+        $settings = new MercadoPagoSettingsBase();
+        $mode = $mode ?: $settings->getMode();
+
+        if (array_key_exists($mode, self::$accountCurrencies)) {
+            return self::$accountCurrencies[$mode];
+        }
+
+        return self::$accountCurrencies[$mode] = self::resolveAccountCurrency($mode, $settings->getAccessToken($mode));
+    }
+
+    public static function resolveAccountCurrency($mode, $accessToken)
+    {
+        $currency = self::getStoredAccountCurrency($mode, $accessToken);
+        if (!$currency && $accessToken) {
+            $currency = self::fetchAccountCurrency($accessToken);
+            if ($currency) {
+                update_option('fluent_cart_mercado_pago_' . $mode . '_account_currency', ['token' => md5($accessToken), 'currency' => $currency], false);
+            }
+        }
+
+        return $currency ?: null;
+    }
+
+    /**
+     * Stored with the token's hash: a lookup still running for a replaced token cannot apply its currency to the new one.
+     */
+    public static function getStoredAccountCurrency($mode, $accessToken)
+    {
+        $stored = (array) get_option('fluent_cart_mercado_pago_' . $mode . '_account_currency', []);
+
+        return $accessToken && Arr::get($stored, 'token') === md5($accessToken) ? Arr::get($stored, 'currency') : null;
+    }
+
+    public static function fetchAccountCurrency($accessToken)
+    {
+        if (!$accessToken) {
+            return null;
+        }
+
+        $response = wp_remote_get('https://api.mercadopago.com/users/me', [
+            'headers' => ['Authorization' => 'Bearer ' . $accessToken],
+            'timeout' => 10,
+        ]);
+
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            return null;
+        }
+
+        $siteId = Arr::get((array) json_decode(wp_remote_retrieve_body($response), true), 'site_id');
+
+        return Arr::get(self::SITE_CURRENCIES, (string) $siteId);
     }
 
     public static function getFctSubscriptionStatus($mercadoPagoStatus)
