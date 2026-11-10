@@ -70,6 +70,24 @@ class MercadoPagoProcessor
             $paymentData['payer']['address'] = Arr::get($payerInfo, 'address', []);
         }
 
+        if ($paymentMethodId === 'pse') {
+            $paymentData['transaction_details'] = [
+                'financial_institution' => Arr::get($mpFormData, 'transaction_details.financial_institution', ''),
+            ];
+            $paymentData['payer']['entity_type'] = Arr::get($mpFormData, 'payer.entity_type', '');
+            $paymentData['additional_info'] = ['ip_address' => $ipAddress];
+
+            // PSE rejects an empty address field; an absent one is allowed.
+            $address = array_filter((array) Arr::get($paymentData, 'payer.address', []), function ($value) {
+                return $value !== '' && $value !== null;
+            });
+            if ($address) {
+                $paymentData['payer']['address'] = $address;
+            } else {
+                unset($paymentData['payer']['address']);
+            }
+        }
+
 
         $paymentData = apply_filters('fluent_cart/mercadopago/onetime_payment_args', $paymentData, [
             'order'       => $order,
@@ -86,9 +104,14 @@ class MercadoPagoProcessor
         
 
         if (is_wp_error($result)) {
+            $message = $result->get_error_message();
+            if ($paymentMethodId === 'bolbradesco' && Arr::get((array) $result->get_error_data(), 'status') === 400) {
+                $message = __('Address is not valid. Please check your address and try again. For State, use the abbreviation of the state. E.g.: SP for São Paulo, RJ for Rio de Janeiro, etc.', 'mercado-pago-for-fluent-cart');
+            }
+
             return [
                 'status' => 'failed',
-                'message' => $result->get_error_message(),
+                'message' => $message,
                 'data' => [
                     'payment_data' => $paymentData,
                     'intent' => 'onetime',
