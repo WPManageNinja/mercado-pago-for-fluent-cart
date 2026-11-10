@@ -8,7 +8,6 @@ use FluentCart\App\Models\OrderTransaction;
 use FluentCart\Api\CurrencySettings;
 use FluentCart\App\Services\DateTime\DateTime;
 use FluentCart\Framework\Support\Arr;
-use FluentCart\App\Modules\PaymentMethods\Core\BaseGatewaySettings;
 use MercadoPagoFluentCart\Settings\MercadoPagoSettingsBase;
 
 if (!defined('ABSPATH')) {
@@ -53,25 +52,35 @@ class MercadoPagoHelper
     {
         $settings = new MercadoPagoSettingsBase();
         $mode = $mode ?: $settings->getMode();
-        $key = $mode . '_account_currency';
 
         if (array_key_exists($mode, self::$accountCurrencies)) {
             return self::$accountCurrencies[$mode];
         }
 
-        $currency = $settings->get($key);
-        if (!is_string($currency) || !$currency) {
-            $currency = self::fetchAccountCurrency($settings->getAccessToken($mode));
-            // The lookup can take seconds; write into the row as it is now, and only for the token we looked up.
-            $stored = (array) fluent_cart_get_option($settings->methodHandler, [], false);
-            if ($currency && Arr::get($stored, $mode . '_access_token') === $settings->get($mode . '_access_token') && !Arr::get($stored, $key)) {
-                $stored[$key] = $currency;
-                fluent_cart_update_option($settings->methodHandler, $stored);
-                BaseGatewaySettings::$allSettings[$settings->methodHandler] = $stored;
+        return self::$accountCurrencies[$mode] = self::resolveAccountCurrency($mode, $settings->getAccessToken($mode));
+    }
+
+    public static function resolveAccountCurrency($mode, $accessToken)
+    {
+        $currency = self::getStoredAccountCurrency($mode, $accessToken);
+        if (!$currency && $accessToken) {
+            $currency = self::fetchAccountCurrency($accessToken);
+            if ($currency) {
+                update_option('fluent_cart_mercado_pago_' . $mode . '_account_currency', ['token' => md5($accessToken), 'currency' => $currency], false);
             }
         }
 
-        return self::$accountCurrencies[$mode] = $currency ?: null;
+        return $currency ?: null;
+    }
+
+    /**
+     * Stored with the token's hash: a lookup still running for a replaced token cannot apply its currency to the new one.
+     */
+    public static function getStoredAccountCurrency($mode, $accessToken)
+    {
+        $stored = (array) get_option('fluent_cart_mercado_pago_' . $mode . '_account_currency', []);
+
+        return $accessToken && Arr::get($stored, 'token') === md5($accessToken) ? Arr::get($stored, 'currency') : null;
     }
 
     public static function fetchAccountCurrency($accessToken)

@@ -484,8 +484,8 @@ class MercadoPagoGateway extends AbstractPaymentGateway
 
     private function accountCurrencyHelp($mode)
     {
-        $currency = $this->settings->get($mode . '_account_currency');
-        if (!is_string($currency) || !$currency) {
+        $currency = MercadoPagoHelper::getStoredAccountCurrency($mode, $this->settings->getAccessToken($mode));
+        if (!$currency) {
             return '';
         }
 
@@ -508,14 +508,7 @@ class MercadoPagoGateway extends AbstractPaymentGateway
             $data['live_access_token'] = Helper::encryptKey($data['live_access_token']);
         }
 
-        foreach (['test', 'live'] as $tab) {
-            $token = Helper::decryptKey(Arr::get($data, $tab . '_access_token'));
-            $currency = $token === Helper::decryptKey(Arr::get($oldSettings, $tab . '_access_token')) ? Arr::get($oldSettings, $tab . '_account_currency') : '';
-            if (!$currency && $tab === $mode) {
-                $currency = MercadoPagoHelper::fetchAccountCurrency($token);
-            }
-            $data[$tab . '_account_currency'] = (string) $currency;
-        }
+        MercadoPagoHelper::resolveAccountCurrency($mode, Helper::decryptKey(Arr::get($data, $mode . '_access_token')));
 
         return $data;
     }
