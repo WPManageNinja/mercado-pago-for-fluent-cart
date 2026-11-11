@@ -480,6 +480,41 @@ class MercadoPagoGateway extends AbstractPaymentGateway
         ];
     }
 
+    public function testConnection(string $mode)
+    {
+        if (!Arr::get($this->settings->get(), $mode . '_access_token')) {
+            return new \WP_Error('missing_credentials', $mode === 'live'
+                ? __('No live access token is saved.', 'mercado-pago-for-fluent-cart')
+                : __('No test access token is saved.', 'mercado-pago-for-fluent-cart'));
+        }
+
+        $accessToken = $this->settings->getAccessToken($mode);
+
+        if (!$accessToken) {
+            return new \WP_Error('unreadable_credentials', $mode === 'live'
+                ? __('The saved live access token cannot be read. Paste it again and save.', 'mercado-pago-for-fluent-cart')
+                : __('The saved test access token cannot be read. Paste it again and save.', 'mercado-pago-for-fluent-cart'));
+        }
+
+        // Test tokens now start with APP_USR- as well, so only a legacy TEST- token in the live field is detectable.
+        if ($mode === 'live' && strpos($accessToken, 'TEST-') === 0) {
+            return new \WP_Error('mode_mismatch', __('The live access token field holds a test token. Paste a token that starts with APP_USR-.', 'mercado-pago-for-fluent-cart'));
+        }
+
+        // https://www.mercadopago.com/developers/en/reference/payment_methods/_payment_methods/get
+        $paymentMethods = MercadoPagoAPI::getMercadoPagoObject('v1/payment_methods', [], $accessToken);
+
+        if (is_wp_error($paymentMethods)) {
+            return $paymentMethods;
+        }
+
+        return [
+            'message' => $mode === 'live'
+                ? __('Mercado Pago accepted the live access token.', 'mercado-pago-for-fluent-cart')
+                : __('Mercado Pago accepted the test access token.', 'mercado-pago-for-fluent-cart')
+        ];
+    }
+
     public static function validateSettings($data): array
     {
         return $data;
