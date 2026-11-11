@@ -81,10 +81,22 @@ class MercadoPagoProcessor
             $address = array_filter((array) Arr::get($paymentData, 'payer.address', []), function ($value) {
                 return $value !== '' && $value !== null;
             });
+            if (!empty($address['street_name']) && empty($address['street_number'])) {
+                $address['street_number'] = preg_match('/\b\d+[A-Za-z]*\b/', $address['street_name'], $matches) ? $matches[0] : '00';
+            }
             if ($address) {
                 $paymentData['payer']['address'] = $address;
             } else {
                 unset($paymentData['payer']['address']);
+            }
+
+            // Same split as Mercado Pago's WooCommerce plugin: first two digits are the area code.
+            $phone = $order->billing_address ? preg_replace('/\D/', '', (string) $order->billing_address->phone) : '';
+            if (strlen($phone) > 2) {
+                $paymentData['payer']['phone'] = [
+                    'area_code' => substr($phone, 0, 2),
+                    'number'    => substr($phone, 2),
+                ];
             }
         }
 
@@ -107,6 +119,21 @@ class MercadoPagoProcessor
             $message = $result->get_error_message();
             if ($paymentMethodId === 'bolbradesco' && Arr::get((array) $result->get_error_data(), 'status') === 400) {
                 $message = __('Address is not valid. Please check your address and try again. For State, use the abbreviation of the state. E.g.: SP for São Paulo, RJ for Rio de Janeiro, etc.', 'mercado-pago-for-fluent-cart');
+            }
+
+            if ($paymentMethodId === 'pse') {
+                $errorData = (array) $result->get_error_data();
+                fluent_cart_add_log(__('Mercado Pago PSE Payment Failed', 'mercado-pago-for-fluent-cart'), sprintf(
+                    /* translators: 1: HTTP status, 2: Mercado Pago error message, 3: Mercado Pago error causes */
+                    __('Mercado Pago rejected the PSE payment. Status: %1$s. Message: %2$s. Cause: %3$s', 'mercado-pago-for-fluent-cart'),
+                    Arr::get($errorData, 'status', ''),
+                    $result->get_error_message(),
+                    wp_json_encode(Arr::get($errorData, 'response.cause', []))
+                ), 'error', [
+                    'module_name' => 'order',
+                    'module_id'   => $order->id,
+                    'log_type'    => 'payment',
+                ]);
             }
 
             return [
