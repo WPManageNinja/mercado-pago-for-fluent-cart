@@ -77,14 +77,32 @@ class MercadoPagoProcessor
             $paymentData['payer']['entity_type'] = Arr::get($mpFormData, 'payer.entity_type', '');
             $paymentData['additional_info'] = ['ip_address' => $ipAddress];
 
-            // PSE rejects an empty address field; an absent one is allowed.
+            // PSE needs at least one of street, city or postcode. Send only the fields we have.
             $address = array_filter((array) Arr::get($paymentData, 'payer.address', []), function ($value) {
                 return $value !== '' && $value !== null;
             });
+            if (!empty($address['street_name']) && empty($address['street_number'])) {
+                $address['street_number'] = preg_match('/\b\d+[A-Za-z]*\b/', $address['street_name'], $matches) ? $matches[0] : '00';
+            }
+            if (empty($address['federal_unit']) && $order->billing_address && $order->billing_address->state) {
+                $address['federal_unit'] = (string) $order->billing_address->state;
+            }
             if ($address) {
                 $paymentData['payer']['address'] = $address;
             } else {
                 unset($paymentData['payer']['address']);
+            }
+
+            // PSE wants a 3-digit area code. A 12-digit number starting with 57 carries Colombia's country code.
+            $phone = $order->billing_address ? preg_replace('/\D/', '', (string) $order->billing_address->phone) : '';
+            if (strlen($phone) === 12 && strpos($phone, '57') === 0) {
+                $phone = substr($phone, 2);
+            }
+            if (strlen($phone) > 3) {
+                $paymentData['payer']['phone'] = [
+                    'area_code' => substr($phone, 0, 3),
+                    'number'    => substr($phone, 3),
+                ];
             }
         }
 
@@ -109,6 +127,39 @@ class MercadoPagoProcessor
                 $message = __('Address is not valid. Please check your address and try again. For State, use the abbreviation of the state. E.g.: SP for São Paulo, RJ for Rio de Janeiro, etc.', 'mercado-pago-for-fluent-cart');
             }
 
+            if ($paymentMethodId === 'pse') {
+                $errorData = (array) $result->get_error_data();
+                $logContent = sprintf(
+                    /* translators: 1: HTTP status, 2: Mercado Pago error message, 3: Mercado Pago error response */
+                    __('Mercado Pago rejected the PSE payment. Status: %1$s. Message: %2$s. Response: %3$s', 'mercado-pago-for-fluent-cart'),
+                    Arr::get($errorData, 'status', ''),
+                    $result->get_error_message(),
+                    wp_json_encode(Arr::get($errorData, 'response') ?: [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                );
+
+                // Mercado Pago answers 424 without naming the field when the phone or the address is missing.
+                if (Arr::get($errorData, 'status') === 424) {
+                    $sentAddress = (array) Arr::get($paymentData, 'payer.address', []);
+                    $missing = '';
+                    if (!Arr::get($paymentData, 'payer.phone')) {
+                        $message = __('PSE needs a phone number in your billing address. Add one and try again, or choose another payment method.', 'mercado-pago-for-fluent-cart');
+                        $missing = __('No billing phone was sent. PSE needs one. Turn on the Phone field in checkout billing fields.', 'mercado-pago-for-fluent-cart');
+                    } elseif (!Arr::get($sentAddress, 'street_name') && !Arr::get($sentAddress, 'zip_code') && !Arr::get($sentAddress, 'city') && !Arr::get($sentAddress, 'street_number')) {
+                        $message = __('PSE needs a billing address with a street, city or postcode. Add one and try again, or choose another payment method.', 'mercado-pago-for-fluent-cart');
+                        $missing = __('No billing street, city or postcode was sent. PSE needs at least one.', 'mercado-pago-for-fluent-cart');
+                    }
+                    if ($missing) {
+                        $logContent .= ' ' . $missing;
+                    }
+                }
+
+                fluent_cart_add_log(__('Mercado Pago PSE Payment Failed', 'mercado-pago-for-fluent-cart'), $logContent, 'error', [
+                    'module_name' => 'order',
+                    'module_id'   => $order->id,
+                    'log_type'    => 'payment',
+                ]);
+            }
+
             return [
                 'status' => 'failed',
                 'message' => $message,
@@ -124,7 +175,19 @@ class MercadoPagoProcessor
 
 
         if (!in_array(Arr::get($result, 'status'), ['approved', 'authorized', 'pending', 'in_process'])) {
- 
+            if ($paymentMethodId === 'pse') {
+                fluent_cart_add_log(__('Mercado Pago PSE Payment Failed', 'mercado-pago-for-fluent-cart'), sprintf(
+                    /* translators: 1: Mercado Pago payment status, 2: Mercado Pago status detail */
+                    __('Mercado Pago did not accept the PSE payment. Status: %1$s. Detail: %2$s', 'mercado-pago-for-fluent-cart'),
+                    Arr::get($result, 'status', ''),
+                    Arr::get($result, 'status_detail', '')
+                ), 'error', [
+                    'module_name' => 'order',
+                    'module_id'   => $order->id,
+                    'log_type'    => 'payment',
+                ]);
+            }
+
             return [
                 'status' => 'failed',
                 'message' => __('Payment failed', 'mercado-pago-for-fluent-cart'),
